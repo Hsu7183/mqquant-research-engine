@@ -1,0 +1,49 @@
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs and run outputs
+*.log
+logs/
+run_history/
+runs/
+artifacts/
+tmp/
+temp/
+
+# Data storage (large / generated)
+data/raw/
+data/archive/
+data/processed/
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep v2 skeleton placeholders trackable
+!v2/runs/
+!v2/runs/.gitkeep
+!v2/data/samples/
+!v2/data/samples/.gitkeep
+!v2/data/schemas/
+!v2/data/schemas/.gitkeep

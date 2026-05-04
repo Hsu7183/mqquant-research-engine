@@ -2,21 +2,24 @@
 
 ## 目前狀態（截至 2026-05-04）
 
-1. `README.md` 與 `AGENTS.md` 已建立。
-2. 本 repository 目前仍處於「規格初始化階段」，以文件定義優先，尚未進入程式實作。
-3. 目前主線定義為 `01-01-01`，但尚未導入 `01-01-01` 的原始程式內容。
-4. 尚未實作 WFO（Walk-Forward Optimization）流程與相關執行模組。
-5. 下一步重點為完成核心規格文件，作為後續 Codex 實作與 ChatGPT 審查的共同依據。
+1. 已建立 `v2` 乾淨骨架（目前僅保留必要目錄與 placeholder）。
+2. 尚未導入舊版 `01-01-01` 內容。
+3. 目前 `v2` 程式層仍為 placeholder，尚未進入策略實作。
+4. 尚未實作真實策略邏輯。
+5. 尚未實作完整 WFO/OOS 計算流程。
 
-## 本次文件建置範圍
+## 本次骨架收斂與版控清理
 
-- `00_系統規範/SYSTEM_SPEC.md`
-- `00_系統規範/交易與回測核心前提.md`
-- `02_驗證方法/OOS.md`
-- `02_驗證方法/WFO.md`
+- 新增/更新 `.gitignore`，納入 Python 快取、虛擬環境、日誌、執行產物、資料檔、憑證與系統垃圾檔忽略規則。
+- 保留 `v2/runs/.gitkeep` 追蹤方式，並確保 `v2/data/samples/`、`v2/data/schemas/` 可被追蹤。
+- 補上 Phase 1 依賴用途說明（`pandas`、`pydantic`、`PyYAML`、`typer`）。
 
-## 目前尚未進行項目
+## 目前尚未完成事項
 
-- 未建立 optimizer / OOS / forward-test 程式模組。
-- 未建立 Python 程式或任何實作框架。
-- 未建立大型歷史資料資料夾（如 `data/raw`、`data/processed`、`runs`），待資料治理策略定案後再決定。
+- 尚未建立真實策略訊號與下單決策邏輯。
+- 尚未建立完整 optimizer。
+- 尚未實作 PBO/DSR、Forward Test、Baseline/Challenger。
+
+## 下一步建議
+
+先完成 `contracts + loaders + WFO splitter` 三個基礎模組，再進入後續策略與驗證流程。
