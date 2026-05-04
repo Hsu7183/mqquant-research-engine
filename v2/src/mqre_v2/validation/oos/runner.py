@@ -25,7 +25,12 @@ REQUIRED_COLUMNS = {
 def _to_dataframe(trades: Iterable[TradeRecord] | pd.DataFrame) -> pd.DataFrame:
     if isinstance(trades, pd.DataFrame):
         df = trades.copy()
+        if df.empty:
+            raise ValueError("trades cannot be empty")
     else:
+        if isinstance(trades, (list, tuple)) and len(trades) == 0:
+            raise ValueError("trades cannot be empty")
+
         rows = []
         for trade in trades:
             if isinstance(trade, TradeRecord):
@@ -36,12 +41,12 @@ def _to_dataframe(trades: Iterable[TradeRecord] | pd.DataFrame) -> pd.DataFrame:
                 raise TypeError("trades must be TradeRecord list, dict list, or DataFrame")
         df = pd.DataFrame(rows)
 
+    if df.empty:
+        raise ValueError("trades cannot be empty")
+
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise ValueError(f"missing required trade columns: {sorted(missing)}")
-
-    if df.empty:
-        raise ValueError("trade records cannot be empty")
 
     return df
 
@@ -90,3 +95,4 @@ def evaluate_oos_trades(trades: Iterable[TradeRecord] | pd.DataFrame) -> dict[st
         "long_trades": long_trades,
         "short_trades": short_trades,
     }
+
