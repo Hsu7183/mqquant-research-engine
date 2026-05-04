@@ -13,18 +13,21 @@ jobs:
         working-directory: v2
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Show structure
+      - name: Debug tree
         run: |
           pwd
           ls -R
+
+      - name: Debug checkout commit
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          git rev-parse HEAD
 
       - name: Install dependencies
         run: |
