@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mqre_v2.decision.audit_log import DecisionAuditRecord, append_decision_audit
+
 
 @dataclass(frozen=True)
 class PromotionRecommendation:
@@ -69,6 +71,7 @@ def export_recommendation_report(
     min_score: float = 100.0,
     min_pass_rate: float = 0.6,
     max_mdd: float = 15000.0,
+    audit_log_path: str | None = None,
 ) -> dict:
     source = Path(ranking_report_path)
     ranking_report = json.loads(source.read_text(encoding="utf-8"))
@@ -90,6 +93,23 @@ def export_recommendation_report(
         json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
         encoding="utf-8",
     )
+
+    if audit_log_path is not None:
+        append_decision_audit(
+            audit_log_path,
+            DecisionAuditRecord(
+                timestamp=payload["generated_at"],
+                run_id=str(ranking_report.get("run_id", "")),
+                strategy_name=recommendation.strategy_name,
+                score=recommendation.score,
+                recommend_promote=recommendation.recommend_promote,
+                reason=recommendation.reason,
+                risk_warnings=recommendation.risk_warnings,
+                requires_human_review=recommendation.requires_human_review,
+                source_report_path=ranking_report_path,
+            ),
+        )
+
     return payload
 
 

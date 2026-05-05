@@ -61,7 +61,7 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 
 9. Promotion Recommendation
 
-   讀取標準化 ranking JSON，依分數、pass rate 與 MDD 門檻產生策略升級建議報告。此模式只產生 recommendation，不會自動下單、不會自動切換策略，且 `requires_human_review=True`。
+   讀取標準化 ranking JSON，依分數、pass rate 與 MDD 門檻產生策略升級建議報告，並可寫入 Decision Audit Log。此模式只產生 recommendation 與決策歷史紀錄，不會自動下單、不會自動切換策略，且 `requires_human_review=True`。
 
 ## 建議實戰流程
 
@@ -81,6 +81,7 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 - 目前不會自動下單。
 - Auto Research Pipeline 是全自動研究，不是全自動交易。
 - Strategy Registry 只登錄 promoted 策略為 active，不代表啟動交易。
-- Promotion Recommendation 只產生建議，不自動下單、不自動切換策略。
+- Promotion Recommendation 只產生建議與 Decision Audit Log，不自動下單、不自動切換策略。
+- Decision Audit Log 可回溯每次 promotion decision。
 - Level 1～4 目前只做研究、報表、觀察與決策基礎。
 - TXT 格式必須符合標準 TradeRecord 欄位契約。

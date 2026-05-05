@@ -46,6 +46,7 @@ Step5：Forward Test（baseline vs challenger）
 - Forward Evaluation
 - Strategy Registry
 - Promotion Recommendation Report
+- Decision Audit Log
 - Baseline vs Challenger Decision
 - WFO JSON Report Exporter
 - Auto Research Pipeline
@@ -65,6 +66,7 @@ TXT 資料夾
 -> Forward Evaluation
 -> Strategy Registry active
 -> Promotion Recommendation
+-> Decision Audit Log
 ```
 
 注意：
@@ -76,6 +78,8 @@ TXT 資料夾
 - promoted 策略可登錄為 active，但不代表啟動交易
 - Promotion Recommendation 只產生建議，不自動切換實盤策略
 - requires_human_review=True
+- Decision Audit Log 可回溯每次 promotion decision
+- 仍不自動下單
 
 ## GUI
 
@@ -105,7 +109,7 @@ run_gui.cmd
 
 ## Test Status
 
-- `python -m pytest -q` = 188 passed
+- `python -m pytest -q` = 193 passed
 
 ## v1 凍結規則
 

@@ -4,7 +4,7 @@
 
 - version: v1.0 (stable)
 - latest commit: d1b30b7801f52b3588c6daee8b59a6c612dd6334
-- tests: 188 passed
+- tests: 193 passed
 - 系統定位：策略治理系統（非交易系統）
 - version: v1.0 stable
 - system type: strategy governance system, not execution system
@@ -12,7 +12,7 @@
 
 ## Test Status
 
-- `python -m pytest -q` = 188 passed
+- `python -m pytest -q` = 193 passed
 
 ## Level 1～4 Mainline
 
@@ -57,6 +57,7 @@ TXT 資料夾
 - Forward Evaluation
 - Strategy Registry
 - Promotion Recommendation Report
+- Decision Audit Log
 - Streamlit GUI
 
 ## GUI Modes
@@ -76,8 +77,10 @@ TXT 資料夾
 - Forward Evaluation 可將 `forward_testing` 策略評估為 `promoted` / `rejected`。
 - Strategy Registry 可將 `promoted` 策略登錄為 `active`。
 - Promotion Recommendation 可根據 ranking report 產生升級建議。
+- Decision Audit Log 可回溯每次 promotion decision。
 - `active` 只代表正式策略版本治理狀態，不代表下單或啟動交易。
 - v4 Auto Decision Layer 已開始；所有建議都保留 `requires_human_review=True`。
+- v4 仍不自動下單、不自動切換策略。
 
 ## Next Steps
 

@@ -707,6 +707,7 @@ def test_generate_promotion_recommendation_from_config_writes_report(tmp_path) -
         {
             "ranking_report_path": str(ranking_path),
             "output_recommendation_path": str(output_path),
+            "audit_log_path": str(tmp_path / "decision_audit_log.csv"),
             "min_score": 100.0,
             "min_pass_rate": 0.6,
             "max_mdd": 15000.0,
@@ -714,5 +715,6 @@ def test_generate_promotion_recommendation_from_config_writes_report(tmp_path) -
     )
 
     assert output_path.is_file()
+    assert (tmp_path / "decision_audit_log.csv").is_file()
     assert payload["recommendation"]["recommend_promote"] is True
     assert payload["recommendation"]["requires_human_review"] is True

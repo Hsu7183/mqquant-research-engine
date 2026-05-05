@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from mqre_v2.automation.auto_research import AutoResearchConfig, run_auto_research
+from mqre_v2.decision.audit_log import read_decision_audit
 from mqre_v2.decision.recommendation import export_recommendation_report
 from mqre_v2.forward.forward_evaluator import (
     ForwardEvaluationConfig,
@@ -277,6 +278,9 @@ def generate_promotion_recommendation_from_config(config: dict) -> dict:
         min_score=_get_float(config, "min_score", 100.0),
         min_pass_rate=_get_float(config, "min_pass_rate", 0.6),
         max_mdd=_get_float(config, "max_mdd", 15000.0),
+        audit_log_path=(
+            str(config["audit_log_path"]) if config.get("audit_log_path") else None
+        ),
     )
 
 
@@ -935,6 +939,10 @@ def _render_promotion_recommendation_mode(st: Any) -> None:
             "output_recommendation_path",
             value="reports/promotion_recommendation.json",
         )
+        audit_log_path = st.text_input(
+            "audit_log_path",
+            value="reports/decision_audit_log.csv",
+        )
         min_score = st.number_input("min_score", value=100.0)
         min_pass_rate = st.number_input(
             "min_pass_rate",
@@ -953,6 +961,7 @@ def _render_promotion_recommendation_mode(st: Any) -> None:
             {
                 "ranking_report_path": ranking_report_path,
                 "output_recommendation_path": output_recommendation_path,
+                "audit_log_path": audit_log_path,
                 "min_score": min_score,
                 "min_pass_rate": min_pass_rate,
                 "max_mdd": max_mdd,
@@ -963,6 +972,7 @@ def _render_promotion_recommendation_mode(st: Any) -> None:
         return
 
     _render_promotion_recommendation_result(st, payload)
+    _render_decision_audit_table(st, audit_log_path)
 
 
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
@@ -1342,6 +1352,16 @@ def _render_promotion_recommendation_result(st: Any, payload: dict) -> None:
     st.subheader("Risk Warnings")
     st.dataframe(
         pd.DataFrame({"warning": recommendation["risk_warnings"]}),
+        use_container_width=True,
+    )
+
+
+def _render_decision_audit_table(st: Any, audit_log_path: str) -> None:
+    records = read_decision_audit(audit_log_path)
+    st.subheader("Decision Audit Log")
+    st.write({"audit_log_path": audit_log_path})
+    st.dataframe(
+        pd.DataFrame([record.__dict__ for record in records]),
         use_container_width=True,
     )
 
