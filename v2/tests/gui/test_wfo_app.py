@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 
+from mqre_v2.forward.forward_log import ForwardTestRecord, append_forward_record
 from mqre_v2.gui.wfo_app import (
     BATCH_RANKING_COLUMNS,
     OPTIMIZER_TABLE_COLUMNS,
@@ -10,6 +11,7 @@ from mqre_v2.gui.wfo_app import (
     build_round_dataframe,
     generate_xs_batch_from_config,
     load_parameter_grid_preview,
+    manage_forward_status_from_config,
     run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
     run_simple_optimizer,
@@ -78,6 +80,23 @@ parameters:
   TimeStopBars: [20]
 """,
         encoding="utf-8",
+    )
+
+
+def _write_forward_log(path, strategy_name: str = "alpha") -> None:
+    append_forward_record(
+        str(path),
+        ForwardTestRecord(
+            strategy_name=strategy_name,
+            txt_path=f"{strategy_name}.txt",
+            status="candidate",
+            created_at="2026-05-05T00:00:00+00:00",
+            updated_at="2026-05-05T00:00:00+00:00",
+            source_score=88.5,
+            source_pass_rate=0.75,
+            source_total_test_net_profit=1234.0,
+            notes="",
+        ),
     )
 
 
@@ -424,3 +443,36 @@ def test_generate_xs_batch_from_config(tmp_path) -> None:
     assert result["generated_count"] == 4
     assert len(result["paths"]) == 4
     assert result["filenames"][0] == "gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.xs"
+
+
+def test_manage_forward_status_from_config_updates_status(tmp_path) -> None:
+    forward_log_path = tmp_path / "forward_test_log.csv"
+    _write_forward_log(forward_log_path, "alpha")
+
+    records = manage_forward_status_from_config(
+        {
+            "forward_log_path": str(forward_log_path),
+            "strategy_name": "alpha",
+            "new_status": "forward_testing",
+            "notes": "started paper observation",
+        }
+    )
+
+    assert records[0]["strategy_name"] == "alpha"
+    assert records[0]["status"] == "forward_testing"
+    assert records[0]["notes"] == "started paper observation"
+
+
+def test_manage_forward_status_from_config_missing_strategy_raises(tmp_path) -> None:
+    forward_log_path = tmp_path / "forward_test_log.csv"
+    _write_forward_log(forward_log_path, "alpha")
+
+    with pytest.raises(ValueError):
+        manage_forward_status_from_config(
+            {
+                "forward_log_path": str(forward_log_path),
+                "strategy_name": "missing",
+                "new_status": "rejected",
+                "notes": "not found",
+            }
+        )

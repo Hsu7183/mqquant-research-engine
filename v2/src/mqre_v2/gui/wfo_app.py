@@ -14,6 +14,7 @@ from mqre_v2.forward.forward_log import (
     ForwardTestRecord,
     append_forward_record,
     read_forward_records,
+    update_forward_status,
 )
 from mqre_v2.optimizer.parameter_grid import expand_parameter_grid, load_parameter_grid
 from mqre_v2.optimizer.xs_batch import generate_xs_batch
@@ -193,6 +194,17 @@ def generate_xs_batch_from_config(config: dict) -> dict:
     }
 
 
+def manage_forward_status_from_config(config: dict) -> list[dict]:
+    forward_log_path = str(config["forward_log_path"])
+    update_forward_status(
+        csv_path=forward_log_path,
+        strategy_name=str(config["strategy_name"]),
+        new_status=str(config["new_status"]),
+        notes=str(config.get("notes", "")),
+    )
+    return [record.__dict__ for record in read_forward_records(forward_log_path)]
+
+
 def run_batch_txt_ranking_from_config(config: dict) -> list[dict]:
     folder = Path(str(config["txt_folder_path"]))
     if not folder.is_dir():
@@ -295,8 +307,12 @@ def main() -> None:
     comparison_mode = "Baseline vs Challenger"
     optimizer_mode = "⭐ Optimizer（新增）"
     batch_mode = "批量 TXT 排名"
+    forward_mode = "Forward Test 管理"
     with st.sidebar:
-        mode = st.selectbox("mode", [single_mode, comparison_mode, optimizer_mode, batch_mode])
+        mode = st.selectbox(
+            "mode",
+            [single_mode, comparison_mode, optimizer_mode, batch_mode, forward_mode],
+        )
 
     if mode == single_mode:
         _render_single_wfo_mode(st)
@@ -304,8 +320,10 @@ def main() -> None:
         _render_baseline_challenger_mode(st)
     elif mode == optimizer_mode:
         _render_optimizer_mode(st)
-    else:
+    elif mode == batch_mode:
         _render_batch_ranking_mode(st)
+    else:
+        _render_forward_management_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -490,6 +508,41 @@ def _render_batch_ranking_mode(st: Any) -> None:
         return
 
     _render_batch_ranking_result(st, results)
+
+
+def _render_forward_management_mode(st: Any) -> None:
+    with st.sidebar:
+        forward_log_path = st.text_input(
+            "forward_log_path",
+            value="reports/forward_test_log.csv",
+        )
+        strategy_name = st.text_input("strategy_name")
+        new_status = st.selectbox(
+            "new_status",
+            ["candidate", "forward_testing", "promoted", "rejected"],
+        )
+        notes = st.text_area("notes")
+        update_clicked = st.button("更新策略狀態")
+
+    if update_clicked:
+        try:
+            records = manage_forward_status_from_config(
+                {
+                    "forward_log_path": forward_log_path,
+                    "strategy_name": strategy_name,
+                    "new_status": new_status,
+                    "notes": notes,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Updated {strategy_name} to {new_status}.")
+            _render_forward_records_table(st, forward_log_path, records)
+        return
+
+    records = [record.__dict__ for record in read_forward_records(forward_log_path)]
+    _render_forward_records_table(st, forward_log_path, records)
 
 
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
@@ -732,11 +785,21 @@ def _render_forward_test_controls(
 
 def _render_forward_log_table(st: Any, forward_log_path: str) -> None:
     records = read_forward_records(forward_log_path)
-    st.write({"forward_log_path": forward_log_path})
-    st.dataframe(
-        pd.DataFrame([record.__dict__ for record in records]),
-        use_container_width=True,
+    _render_forward_records_table(
+        st,
+        forward_log_path,
+        [record.__dict__ for record in records],
     )
+
+
+def _render_forward_records_table(
+    st: Any,
+    forward_log_path: str,
+    records: list[dict],
+) -> None:
+    st.subheader("Forward Test Log")
+    st.write({"forward_log_path": forward_log_path})
+    st.dataframe(pd.DataFrame(records), use_container_width=True)
 
 
 def _build_forward_record_from_pipeline_result(result: dict) -> ForwardTestRecord:
