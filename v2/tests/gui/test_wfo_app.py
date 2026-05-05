@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from mqre_v2.gui.wfo_app import (
+    build_round_dataframe,
     run_baseline_challenger_from_config,
     run_txt_wfo_from_config,
 )
@@ -172,3 +173,42 @@ def test_run_baseline_challenger_invalid_challenger_txt_path_raises(tmp_path) ->
         run_baseline_challenger_from_config(
             _comparison_config(baseline_path, challenger_path)
         )
+
+
+def test_build_round_dataframe_columns_and_cum_pnl() -> None:
+    df = build_round_dataframe(
+        [
+            {
+                "round_id": 1,
+                "test_net_profit": 100.0,
+                "test_mdd": 20.0,
+                "test_pf": 1.5,
+                "test_trade_count": 25,
+            },
+            {
+                "round_id": 2,
+                "test_net_profit": -40.0,
+                "test_mdd": 60.0,
+                "test_pf": 0.8,
+                "test_trade_count": 18,
+            },
+            {
+                "round_id": 3,
+                "test_net_profit": 70.0,
+                "test_mdd": 30.0,
+                "test_pf": 1.2,
+                "test_trade_count": 21,
+            },
+        ]
+    )
+
+    assert list(df.columns) == [
+        "round_id",
+        "test_net_profit",
+        "test_mdd",
+        "test_pf",
+        "test_trade_count",
+        "cum_pnl",
+    ]
+    assert df["round_id"].tolist() == [1, 2, 3]
+    assert df["cum_pnl"].tolist() == pytest.approx([100.0, 60.0, 130.0])

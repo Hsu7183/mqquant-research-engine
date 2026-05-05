@@ -4,6 +4,8 @@ import json
 from datetime import date, datetime, timezone
 from typing import Any
 
+import pandas as pd
+
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.validation.decision import compare_baseline_challenger
 from mqre_v2.validation.wfo import (
@@ -14,6 +16,14 @@ from mqre_v2.validation.wfo import (
     default_optimize_fn,
     run_wfo,
 )
+
+ROUND_DATAFRAME_COLUMNS = [
+    "round_id",
+    "test_net_profit",
+    "test_mdd",
+    "test_pf",
+    "test_trade_count",
+]
 
 
 def run_txt_wfo_from_config(config: dict) -> dict:
@@ -60,6 +70,23 @@ def run_baseline_challenger_from_config(config: dict) -> dict:
         "challenger": challenger_payload,
         "decision": decision_result_to_dict(decision),
     }
+
+
+def build_round_dataframe(round_results: list | tuple) -> pd.DataFrame:
+    rows = [
+        {column: _get_round_value(result, column) for column in ROUND_DATAFRAME_COLUMNS}
+        for result in round_results
+    ]
+    df = pd.DataFrame(rows, columns=ROUND_DATAFRAME_COLUMNS)
+
+    for column in ROUND_DATAFRAME_COLUMNS:
+        df[column] = pd.to_numeric(
+            df[column].replace({"Infinity": float("inf"), "-Infinity": -float("inf")}),
+            errors="coerce",
+        )
+
+    df["cum_pnl"] = df["test_net_profit"].cumsum()
+    return df
 
 
 def main() -> None:
@@ -160,9 +187,10 @@ def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
 def _render_single_wfo_result(st: Any, payload: dict) -> None:
     _render_pass_status(st, payload)
     _render_summary(st, "Summary", payload["summary"])
+    _render_round_charts(st, payload["round_results"])
 
     st.subheader("Round Results")
-    st.dataframe(payload["round_results"], use_container_width=True)
+    _render_round_results_table(st, payload["round_results"])
 
     st.download_button(
         "下載 JSON",
@@ -190,10 +218,15 @@ def _render_baseline_challenger_result(st: Any, payload: dict) -> None:
     _render_summary(st, "Baseline Summary", payload["baseline"]["summary"])
     _render_summary(st, "Challenger Summary", payload["challenger"]["summary"])
 
+    st.subheader("Baseline 圖表")
+    _render_round_charts(st, payload["baseline"]["round_results"])
+    st.subheader("Challenger 圖表")
+    _render_round_charts(st, payload["challenger"]["round_results"])
+
     st.subheader("Baseline Round Results")
-    st.dataframe(payload["baseline"]["round_results"], use_container_width=True)
+    _render_round_results_table(st, payload["baseline"]["round_results"])
     st.subheader("Challenger Round Results")
-    st.dataframe(payload["challenger"]["round_results"], use_container_width=True)
+    _render_round_results_table(st, payload["challenger"]["round_results"])
 
     st.download_button(
         "下載比較 JSON",
@@ -214,6 +247,9 @@ def _render_pass_status(st: Any, payload: dict) -> None:
 
 def _render_summary(st: Any, title: str, summary: dict) -> None:
     st.subheader(title)
+    if summary["pass_rate"] < 0.6:
+        st.warning(f"{title} pass_rate below 0.6: {summary['pass_rate']}")
+
     columns = st.columns(3)
     summary_items = [
         ("total_rounds", summary["total_rounds"]),
@@ -228,6 +264,52 @@ def _render_summary(st: Any, title: str, summary: dict) -> None:
     ]
     for index, (label, value) in enumerate(summary_items):
         columns[index % len(columns)].metric(label, value)
+
+
+def _render_round_charts(st: Any, round_results: list) -> None:
+    df = build_round_dataframe(round_results)
+    if df.empty:
+        st.info("No WFO round results to chart.")
+        return
+
+    chart_df = df.replace([float("inf"), -float("inf")], pd.NA)
+    indexed_df = chart_df.set_index("round_id")
+
+    st.subheader("WFO 每輪淨利")
+    st.bar_chart(indexed_df["test_net_profit"])
+
+    st.subheader("WFO 每輪 MDD")
+    st.bar_chart(indexed_df["test_mdd"])
+
+    st.subheader("WFO 每輪 PF")
+    st.bar_chart(indexed_df["test_pf"])
+
+    st.subheader("累積損益曲線")
+    st.line_chart(indexed_df["cum_pnl"])
+
+
+def _render_round_results_table(st: Any, round_results: list) -> None:
+    table = pd.DataFrame(round_results)
+    if table.empty:
+        st.dataframe(table, use_container_width=True)
+        return
+
+    if "pass_flag" in table.columns:
+        table = table.copy()
+        table["pass_marker"] = table["pass_flag"].map(
+            lambda passed: "" if bool(passed) else "FAIL"
+        )
+        styled = table.style.apply(_highlight_failed_rounds, axis=1)
+        st.dataframe(styled, use_container_width=True)
+        return
+
+    st.dataframe(table, use_container_width=True)
+
+
+def _highlight_failed_rounds(row: pd.Series) -> list[str]:
+    if not bool(row.get("pass_flag", True)):
+        return ["background-color: #ffd6d6"] * len(row)
+    return [""] * len(row)
 
 
 def _run_wfo_for_txt(txt_path: str, strategy_name: str, config: dict) -> WfoRunResult:
@@ -273,6 +355,12 @@ def _get_int(config: dict, key: str, default: int) -> int:
 
 def _get_float(config: dict, key: str, default: float) -> float:
     return float(config.get(key, default))
+
+
+def _get_round_value(round_result: Any, key: str) -> Any:
+    if isinstance(round_result, dict):
+        return round_result[key]
+    return getattr(round_result, key)
 
 
 if __name__ == "__main__":
