@@ -7,6 +7,7 @@
 3. docs/WFO_SPEC.md
 4. docs/WFO_MODULES.md
 5. docs/CURRENT_STATUS.md
+6. docs/GUI_USAGE.md
 
 並遵守：
 
@@ -17,7 +18,7 @@
   - WFO
   - Baseline 對比
 
-系統流程：
+## System Flow
 
 Step1：Optimizer
 Step2：Single OOS
@@ -39,37 +40,35 @@ Step5：Forward Test（baseline vs challenger）
 - Optimizer Adapter Skeleton
 - WFO TXT Adapter
 - WFO TXT CLI
+- TXT WFO Pipeline
+- Forward Test Tracking
+- Forward Test 管理 GUI
 - Baseline vs Challenger Decision
 - WFO JSON Report Exporter
+- Auto Research Pipeline
 
-目前 WFO 核心檔案：
+## Level 1～4 Mainline
 
-- docs/WFO_SPEC.md
-- docs/WFO_MODULES.md
-- docs/CURRENT_STATUS.md
-- v2/src/mqre_v2/io/txt_parser.py
-- v2/src/mqre_v2/validation/wfo/windows.py
-- v2/src/mqre_v2/validation/wfo/results.py
-- v2/src/mqre_v2/validation/wfo/gates.py
-- v2/src/mqre_v2/validation/wfo/runner.py
-- v2/src/mqre_v2/validation/wfo/adapters.py
-- v2/src/mqre_v2/validation/wfo/txt_adapter.py
-- v2/src/mqre_v2/cli/wfo_txt.py
-- v2/src/mqre_v2/validation/decision.py
-- v2/src/mqre_v2/reporting/wfo_report.py
+Level 1～4 是目前主線，僅涵蓋研究、報表、觀察與決策基礎。
 
-目前測試狀態：
+最新流程：
 
-- python -m pytest -q 已通過 80 passed
+```text
+TXT 資料夾
+-> WFO Pipeline
+-> Ranking JSON
+-> TopN
+-> Forward candidate
+```
 
-下一步建議：
+注意：
 
-- 將 CLI 加入 README 使用方式
-- 建立 baseline/challenger 雙 TXT 比較 CLI
-- 建立 GitHub Actions 自動產 report
-- 接 0313 / 1001 / 0807 真實 TXT
+- 這是全自動研究，不是全自動交易
+- 目前不接券商
+- 目前不接 XQ API
+- 目前不會自動下單
 
-## GUI Launch And Current Status
+## GUI
 
 GUI 已有 6 個模式：
 
@@ -79,17 +78,6 @@ GUI 已有 6 個模式：
 4. 批量 TXT 排名
 5. Forward Test 管理
 6. Auto Research Pipeline
-
-Auto Research Pipeline 會執行：
-
-TXT 資料夾 -> WFO Pipeline -> 排名 JSON -> Top 策略加入 Forward Test candidate
-
-注意：
-
-- 這是全自動研究，不是全自動交易
-- 目前仍不接券商
-- 目前仍不接 XQ API
-- 目前仍不會自動下單
 
 啟動方式：
 
@@ -103,10 +91,6 @@ TXT 資料夾 -> WFO Pipeline -> 排名 JSON -> Top 策略加入 Forward Test ca
 run_gui.cmd
 ```
 
-最新測試狀態：
+## Test Status
 
-- `python -m pytest -q` = 129 passed
-
-最新 commit：
-
-- `32dcb0eee788691fe37b6a7f032d819153f144f6`
+- `python -m pytest -q` = 137 passed

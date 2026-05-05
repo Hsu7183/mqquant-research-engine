@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -29,7 +30,9 @@ def test_run_auto_research_outputs_json(tmp_path: Path) -> None:
     run_auto_research(config)
 
     payload = json.loads(Path(config.output_json_path).read_text(encoding="utf-8"))
+    assert "generated_at" in payload
     assert payload["total_strategies"] == 2
+    assert len(payload["top_n"]) == 2
     assert len(payload["all_results"]) == 2
 
 
@@ -60,6 +63,32 @@ def test_run_auto_research_duplicate_top1_is_skipped(tmp_path: Path) -> None:
     assert second["added_to_forward"] is False
     assert second["notes"] == "duplicate skipped"
     assert len(records) == 1
+
+
+def test_run_auto_research_no_auto_forward_does_not_add_record(tmp_path: Path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+    _write_challenger_txt(tmp_path / "challenger.txt")
+    config = replace(_config(tmp_path), auto_add_top1_to_forward=False)
+
+    summary = run_auto_research(config)
+    records = read_forward_records(config.forward_log_path)
+
+    assert summary["added_to_forward"] is False
+    assert summary["notes"] == "auto forward disabled"
+    assert records == []
+
+
+def test_run_auto_research_min_score_threshold_does_not_add_record(tmp_path: Path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+    _write_challenger_txt(tmp_path / "challenger.txt")
+    config = replace(_config(tmp_path), min_score_to_forward=999999.0)
+
+    summary = run_auto_research(config)
+    records = read_forward_records(config.forward_log_path)
+
+    assert summary["added_to_forward"] is False
+    assert summary["notes"] == "score below min_score_to_forward"
+    assert records == []
 
 
 def test_run_auto_research_no_strategy_results_raises(tmp_path: Path) -> None:

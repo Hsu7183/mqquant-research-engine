@@ -49,16 +49,15 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 
 6. Auto Research Pipeline
 
-   讀取 TXT 資料夾，自動執行 TXT -> WFO Pipeline -> 排名 JSON，並依設定將 Top 1 策略加入 Forward Test `candidate`。這是全自動研究流程，不是全自動交易。
+   讀取 TXT 資料夾，自動執行 TXT -> WFO Pipeline -> Ranking JSON -> TopN，並依設定將 Top 1 策略加入 Forward Test `candidate`。這是 Level 1～4 的全自動研究主線，不是全自動交易。
 
 ## 建議實戰流程
 
 1. 用 `parameter_grid` 產生 XS。
 2. 在 XQ 手動回測輸出 TXT。
-3. 用批量 TXT 排名跑 WFO pipeline。
-4. 把 Top 1 加入 Forward Test。
-5. 用 Forward Test 管理更新狀態。
-6. 若要固定執行完整研究流程，可使用 Auto Research Pipeline 產出排名 JSON 並自動登錄 Top 1 candidate。
+3. 使用 Auto Research Pipeline 執行主線流程：TXT 資料夾 -> WFO Pipeline -> Ranking JSON -> TopN -> Forward candidate。
+4. 用 Forward Test 管理更新狀態。
+5. 視需要再用 Baseline vs Challenger 做更細的升級決策。
 
 ## 注意事項
 
@@ -66,4 +65,5 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 - 目前不接 XQ API。
 - 目前不會自動下單。
 - Auto Research Pipeline 是全自動研究，不是全自動交易。
+- Level 1～4 目前只做研究、報表、觀察與決策基礎。
 - TXT 格式必須符合標準 TradeRecord 欄位契約。

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from mqre_v2.forward.forward_log import (
@@ -9,10 +11,7 @@ from mqre_v2.forward.forward_log import (
     append_forward_record,
     read_forward_records,
 )
-from mqre_v2.pipeline.txt_wfo_pipeline import (
-    export_pipeline_result,
-    run_txt_wfo_pipeline,
-)
+from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 
 
 @dataclass(frozen=True)
@@ -37,10 +36,14 @@ def run_auto_research(config: AutoResearchConfig) -> dict[str, Any]:
     if not ranking:
         raise ValueError("no strategy results generated")
 
-    export_pipeline_result(ranking, config.output_json_path)
-
     top_n_results = ranking[: config.top_n]
     top1 = ranking[0]
+    _export_auto_research_json(
+        output_path=config.output_json_path,
+        ranking=ranking,
+        top_n_results=top_n_results,
+    )
+
     added_to_forward = False
     notes = ""
 
@@ -73,6 +76,26 @@ def run_auto_research(config: AutoResearchConfig) -> dict[str, Any]:
         "added_to_forward": added_to_forward,
         "notes": notes,
     }
+
+
+def _export_auto_research_json(
+    output_path: str,
+    ranking: list[dict[str, Any]],
+    top_n_results: list[dict[str, Any]],
+) -> None:
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "total_strategies": len(ranking),
+        "top_n": top_n_results,
+        "top_10": ranking[:10],
+        "all_results": ranking,
+    }
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
 
 
 def _forward_record_exists(forward_log_path: str, strategy_name: str) -> bool:
