@@ -1,5 +1,12 @@
 # Current WFO System Status
 
+## Version
+
+- version: v1.0 (stable)
+- latest commit: d1b30b7801f52b3588c6daee8b59a6c612dd6334
+- tests: 150 passed
+- 系統定位：策略治理系統（非交易系統）
+
 ## Test Status
 
 - `python -m pytest -q` = 150 passed

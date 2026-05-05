@@ -101,3 +101,9 @@ run_gui.cmd
 ## Test Status
 
 - `python -m pytest -q` = 150 passed
+
+## v1 凍結規則
+
+- v1 為穩定版本，不再修改核心邏輯
+- 所有新功能應建立於新分支或 v2
+- 不得在 v1 上直接開發實驗功能
