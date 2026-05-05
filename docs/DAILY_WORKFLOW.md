@@ -1,21 +1,12 @@
 # Daily Workflow
 
-## 每日 / 每週操作流程
-
-Step 1：產生 XS（parameter_grid）
-
-Step 2：XQ 手動回測
-
-Step 3：匯出 TXT
-
-Step 4：GUI → 批量 TXT 排名
-
-Step 5：查看 Top 10
-
-Step 6：Auto Research Pipeline
-
-Step 7：加入 Forward Test（candidate）
-
-Step 8：Forward Evaluation
-
-Step 9：Strategy Registry（promoted / retired）
+1. 用 parameter_grid 產生 XS
+2. 在 XQ 手動回測
+3. 匯出 TXT
+4. GUI 執行批量 TXT 排名
+5. 查看 Top 10
+6. 執行 Auto Research Pipeline
+7. Top1 加入 Forward Test candidate
+8. Forward Evaluation
+9. promoted 策略匯入 Strategy Registry
+10. 人工檢查後才可考慮後續實盤

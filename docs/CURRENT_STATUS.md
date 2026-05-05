@@ -6,6 +6,9 @@
 - latest commit: d1b30b7801f52b3588c6daee8b59a6c612dd6334
 - tests: 150 passed
 - 系統定位：策略治理系統（非交易系統）
+- version: v1.0 stable
+- system type: strategy governance system, not execution system
+- next direction: v2～v4 roadmap
 
 ## Test Status
 

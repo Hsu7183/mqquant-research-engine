@@ -107,3 +107,10 @@ run_gui.cmd
 - v1 為穩定版本，不再修改核心邏輯
 - 所有新功能應建立於新分支或 v2
 - 不得在 v1 上直接開發實驗功能
+
+## v1 Freeze Rule
+
+- v1.0 為 stable baseline
+- 不得在 v1 直接開發實驗功能
+- v2～v4 應使用新分支或新 milestone
+- v5 自動交易暫不開發
