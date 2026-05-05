@@ -63,6 +63,10 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 
    讀取標準化 ranking JSON，依分數、pass rate 與 MDD 門檻產生策略升級建議報告，並可寫入 Decision Audit Log。此模式只產生 recommendation 與決策歷史紀錄，不會自動下單、不會自動切換策略，且 `requires_human_review=True`。
 
+10. Auto Promotion Pipeline
+
+    讀取 ranking JSON，自動產生 promotion recommendation JSON，並同步寫入 Decision Audit Log。此模式提供人工確認用摘要，不會自動下單、不會自動切換實盤策略。
+
 ## 建議實戰流程
 
 1. 用 `parameter_grid` 產生 XS。
@@ -71,8 +75,9 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 4. 用 Forward Test 管理將候選策略切到 `forward_testing`。
 5. 用 Forward Evaluation 產生 `promoted` / `rejected` 判斷。
 6. 用 Strategy Registry 將 `promoted` 策略登錄為 `active`。
-7. 用 Promotion Recommendation 產生升級建議報告。
-8. 視需要再用 Baseline vs Challenger 做更細的升級決策。
+7. 用 Promotion Recommendation 或 Auto Promotion Pipeline 產生升級建議報告。
+8. 檢查 Decision Audit Log，確認每次 promotion decision 可回溯。
+9. 視需要再用 Baseline vs Challenger 做更細的升級決策。
 
 ## 注意事項
 
@@ -82,6 +87,7 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 - Auto Research Pipeline 是全自動研究，不是全自動交易。
 - Strategy Registry 只登錄 promoted 策略為 active，不代表啟動交易。
 - Promotion Recommendation 只產生建議與 Decision Audit Log，不自動下單、不自動切換策略。
+- Auto Promotion Pipeline 只自動產生 recommendation + audit log，仍需人工確認。
 - Decision Audit Log 可回溯每次 promotion decision。
 - Level 1～4 目前只做研究、報表、觀察與決策基礎。
 - TXT 格式必須符合標準 TradeRecord 欄位契約。

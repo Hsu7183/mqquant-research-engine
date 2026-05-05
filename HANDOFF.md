@@ -47,6 +47,7 @@ Step5：Forward Test（baseline vs challenger）
 - Strategy Registry
 - Promotion Recommendation Report
 - Decision Audit Log
+- Auto Promotion Pipeline
 - Baseline vs Challenger Decision
 - WFO JSON Report Exporter
 - Auto Research Pipeline
@@ -67,6 +68,7 @@ TXT 資料夾
 -> Strategy Registry active
 -> Promotion Recommendation
 -> Decision Audit Log
+-> Auto Promotion Pipeline summary
 ```
 
 注意：
@@ -81,9 +83,16 @@ TXT 資料夾
 - Decision Audit Log 可回溯每次 promotion decision
 - 仍不自動下單
 
+## Auto Promotion Pipeline
+
+- 自動產生 promotion recommendation JSON
+- 自動寫入 Decision Audit Log
+- 只輸出人工確認用摘要
+- 仍需人工確認，仍不下單、不自動切換實盤策略
+
 ## GUI
 
-GUI 已有 9 個模式：
+GUI 已有 10 個模式：
 
 1. 單一策略 WFO
 2. Baseline vs Challenger
@@ -94,6 +103,7 @@ GUI 已有 9 個模式：
 7. Forward Evaluation
 8. Strategy Registry
 9. Promotion Recommendation
+10. Auto Promotion Pipeline
 
 啟動方式：
 
@@ -109,7 +119,7 @@ run_gui.cmd
 
 ## Test Status
 
-- `python -m pytest -q` = 193 passed
+- `python -m pytest -q` = 200 passed
 
 ## v1 凍結規則
 

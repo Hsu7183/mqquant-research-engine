@@ -12,6 +12,10 @@ import pandas as pd
 
 from mqre_v2.automation.auto_research import AutoResearchConfig, run_auto_research
 from mqre_v2.decision.audit_log import read_decision_audit
+from mqre_v2.decision.promotion_pipeline import (
+    AutoPromotionConfig,
+    run_auto_promotion_pipeline,
+)
 from mqre_v2.decision.recommendation import export_recommendation_report
 from mqre_v2.forward.forward_evaluator import (
     ForwardEvaluationConfig,
@@ -284,6 +288,19 @@ def generate_promotion_recommendation_from_config(config: dict) -> dict:
     )
 
 
+def run_auto_promotion_from_config(config: dict) -> dict:
+    return run_auto_promotion_pipeline(
+        AutoPromotionConfig(
+            ranking_report_path=str(config["ranking_report_path"]),
+            recommendation_output_path=str(config["recommendation_output_path"]),
+            audit_log_path=str(config["audit_log_path"]),
+            min_score=_get_float(config, "min_score", 100.0),
+            min_pass_rate=_get_float(config, "min_pass_rate", 0.6),
+            max_mdd=_get_float(config, "max_mdd", 15000.0),
+        )
+    )
+
+
 def generate_xs_batch_from_config(config: dict) -> dict:
     paths = generate_xs_batch(
         template_path=str(config["template_path"]),
@@ -473,6 +490,7 @@ def main() -> None:
     forward_evaluation_mode = "Forward Evaluation"
     strategy_registry_mode = "Strategy Registry"
     promotion_recommendation_mode = "Promotion Recommendation"
+    auto_promotion_mode = "Auto Promotion Pipeline"
     with st.sidebar:
         mode = st.selectbox(
             "mode",
@@ -486,6 +504,7 @@ def main() -> None:
                 forward_evaluation_mode,
                 strategy_registry_mode,
                 promotion_recommendation_mode,
+                auto_promotion_mode,
             ],
         )
 
@@ -505,8 +524,10 @@ def main() -> None:
         _render_forward_evaluation_mode(st)
     elif mode == strategy_registry_mode:
         _render_strategy_registry_mode(st)
-    else:
+    elif mode == promotion_recommendation_mode:
         _render_promotion_recommendation_mode(st)
+    else:
+        _render_auto_promotion_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -975,6 +996,55 @@ def _render_promotion_recommendation_mode(st: Any) -> None:
     _render_decision_audit_table(st, audit_log_path)
 
 
+def _render_auto_promotion_mode(st: Any) -> None:
+    with st.sidebar:
+        ranking_report_path = st.text_input(
+            "ranking_report_path",
+            value="dashboard/sample_ranking.json",
+        )
+        recommendation_output_path = st.text_input(
+            "recommendation_output_path",
+            value="reports/auto_promotion_recommendation.json",
+        )
+        audit_log_path = st.text_input(
+            "audit_log_path",
+            value="reports/decision_audit_log.csv",
+        )
+        min_score = st.number_input("min_score", value=100.0)
+        min_pass_rate = st.number_input(
+            "min_pass_rate",
+            value=0.6,
+            min_value=0.0,
+            max_value=1.0,
+            step=0.05,
+        )
+        max_mdd = st.number_input("max_mdd", value=15000.0)
+        run_button = st.button("執行 Auto Promotion")
+
+    if not run_button:
+        st.info("設定 ranking report 與門檻後，按下執行 Auto Promotion。")
+        _render_decision_audit_table(st, audit_log_path)
+        return
+
+    try:
+        payload = run_auto_promotion_from_config(
+            {
+                "ranking_report_path": ranking_report_path,
+                "recommendation_output_path": recommendation_output_path,
+                "audit_log_path": audit_log_path,
+                "min_score": min_score,
+                "min_pass_rate": min_pass_rate,
+                "max_mdd": max_mdd,
+            }
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_auto_promotion_result(st, payload)
+    _render_decision_audit_table(st, audit_log_path)
+
+
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
     return {
         "start_date": st.date_input("start_date", value=date(2020, 1, 1)),
@@ -1353,6 +1423,22 @@ def _render_promotion_recommendation_result(st: Any, payload: dict) -> None:
     st.dataframe(
         pd.DataFrame({"warning": recommendation["risk_warnings"]}),
         use_container_width=True,
+    )
+
+
+def _render_auto_promotion_result(st: Any, payload: dict) -> None:
+    st.subheader("Auto Promotion Pipeline")
+    st.write(
+        {
+            "recommend_promote": payload["recommend_promote"],
+            "strategy_name": payload["strategy_name"],
+            "score": payload["score"],
+            "reason": payload["reason"],
+            "risk_warnings": payload["risk_warnings"],
+            "requires_human_review": payload["requires_human_review"],
+            "recommendation_output_path": payload["recommendation_output_path"],
+            "audit_log_path": payload["audit_log_path"],
+        }
     )
 
 

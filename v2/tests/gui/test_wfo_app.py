@@ -17,6 +17,7 @@ from mqre_v2.gui.wfo_app import (
     load_parameter_grid_preview,
     manage_forward_status_from_config,
     promote_registry_from_config,
+    run_auto_promotion_from_config,
     retire_strategy_from_config,
     run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
@@ -718,3 +719,51 @@ def test_generate_promotion_recommendation_from_config_writes_report(tmp_path) -
     assert (tmp_path / "decision_audit_log.csv").is_file()
     assert payload["recommendation"]["recommend_promote"] is True
     assert payload["recommendation"]["requires_human_review"] is True
+
+
+def test_run_auto_promotion_from_config_returns_summary(tmp_path) -> None:
+    ranking_path = tmp_path / "ranking.json"
+    recommendation_path = tmp_path / "auto_promotion_recommendation.json"
+    audit_log_path = tmp_path / "decision_audit_log.csv"
+    ranking_path.write_text(
+        json.dumps(
+            {
+                "run_id": "20260506_alpha_batch001",
+                "generated_at": "2026-05-06T00:00:00+00:00",
+                "summary": {
+                    "total_strategies": 1,
+                    "valid_strategies": 1,
+                },
+                "top_10": [
+                    {
+                        "rank": 1,
+                        "strategy_name": "alpha",
+                        "score": 120.0,
+                        "total_test_net_profit": 50000.0,
+                        "pass_rate": 0.75,
+                        "max_test_mdd": 10000.0,
+                        "average_test_pf": 1.5,
+                    }
+                ],
+                "all_results": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = run_auto_promotion_from_config(
+        {
+            "ranking_report_path": str(ranking_path),
+            "recommendation_output_path": str(recommendation_path),
+            "audit_log_path": str(audit_log_path),
+            "min_score": 100.0,
+            "min_pass_rate": 0.6,
+            "max_mdd": 15000.0,
+        }
+    )
+
+    assert summary["recommend_promote"] is True
+    assert summary["strategy_name"] == "alpha"
+    assert summary["requires_human_review"] is True
+    assert recommendation_path.is_file()
+    assert audit_log_path.is_file()
