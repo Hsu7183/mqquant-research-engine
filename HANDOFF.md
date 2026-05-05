@@ -68,3 +68,33 @@ Step5：Forward Test（baseline vs challenger）
 - 建立 baseline/challenger 雙 TXT 比較 CLI
 - 建立 GitHub Actions 自動產 report
 - 接 0313 / 1001 / 0807 真實 TXT
+
+## GUI Launch And Current Status
+
+GUI 已有 5 個模式：
+
+1. 單一策略 WFO
+2. Baseline vs Challenger
+3. Optimizer
+4. 批量 TXT 排名
+5. Forward Test 管理
+
+啟動方式：
+
+```powershell
+.\run_gui.ps1
+```
+
+或：
+
+```cmd
+run_gui.cmd
+```
+
+最新測試狀態：
+
+- `python -m pytest -q` = 129 passed
+
+最新 commit：
+
+- `32dcb0eee788691fe37b6a7f032d819153f144f6`
