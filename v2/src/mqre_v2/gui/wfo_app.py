@@ -29,6 +29,7 @@ from mqre_v2.pipeline.txt_wfo_pipeline import (
 )
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.runs.run_manager import RunManifest, create_run_directory, write_manifest
+from mqre_v2.runs.run_txt_validator import validate_run_txt
 from mqre_v2.runs.run_xs_batch import generate_xs_into_run
 from mqre_v2.strategy.registry import (
     promote_from_forward_log,
@@ -234,6 +235,20 @@ def generate_xs_into_run_from_config(config: dict) -> dict:
         "xs_count": len(output_paths),
         "paths": output_paths,
         "filenames": [Path(path).name for path in output_paths],
+    }
+
+
+def validate_run_txt_from_config(config: dict) -> dict:
+    result = validate_run_txt(str(config["run_path"]))
+    return {
+        "run_id": result.run_id,
+        "total_xs": result.total_xs,
+        "total_txt": result.total_txt,
+        "matched": result.matched,
+        "missing_txt": result.missing_txt,
+        "extra_txt": result.extra_txt,
+        "parse_failed": result.parse_failed,
+        "valid_txt": result.valid_txt,
     }
 
 
@@ -537,6 +552,7 @@ def _render_optimizer_mode(st: Any) -> None:
         create_run_clicked = st.button("建立 Run")
         run_path = st.text_input("run_path")
         generate_run_xs_clicked = st.button("產生 XS 到 Run")
+        validate_run_txt_clicked = st.button("驗證 TXT 完整性")
         output_dir = st.text_input("output_dir", value="outputs/xs_batch")
         generate_xs_clicked = st.button("產生 XS 批次")
         load_grid_clicked = st.button("載入參數空間")
@@ -578,6 +594,19 @@ def _render_optimizer_mode(st: Any) -> None:
             st.error(str(exc))
         else:
             _render_run_xs_batch_result(st, xs_result)
+
+    if validate_run_txt_clicked:
+        target_run_path = run_path or _get_session_value(st, "last_run_path", "")
+        try:
+            validation_result = validate_run_txt_from_config(
+                {
+                    "run_path": target_run_path,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_run_txt_validation_result(st, validation_result)
 
     if generate_xs_clicked:
         try:
@@ -996,6 +1025,29 @@ def _render_run_xs_batch_result(st: Any, result: dict) -> None:
     )
     st.dataframe(
         pd.DataFrame({"filename": result["filenames"][:5]}),
+        use_container_width=True,
+    )
+
+
+def _render_run_txt_validation_result(st: Any, result: dict) -> None:
+    st.subheader("驗證 TXT 完整性")
+    st.write(
+        {
+            "total_xs": result["total_xs"],
+            "total_txt": result["total_txt"],
+            "matched": result["matched"],
+            "missing_txt_count": len(result["missing_txt"]),
+            "parse_failed_count": len(result["parse_failed"]),
+        }
+    )
+    st.subheader("Missing TXT")
+    st.dataframe(
+        pd.DataFrame({"filename": result["missing_txt"][:5]}),
+        use_container_width=True,
+    )
+    st.subheader("Parse Failed TXT")
+    st.dataframe(
+        pd.DataFrame({"filename": result["parse_failed"][:5]}),
         use_container_width=True,
     )
 

@@ -20,6 +20,7 @@ from mqre_v2.gui.wfo_app import (
     run_baseline_challenger_from_config,
     run_simple_optimizer,
     run_txt_wfo_from_config,
+    validate_run_txt_from_config,
 )
 
 
@@ -499,6 +500,38 @@ def test_generate_xs_into_run_from_config_writes_xs(tmp_path) -> None:
         "gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.xs",
         "gui-xs_EB0_DB2_ATRS1p5_ATRTP2_TS20_IDX2.xs",
     ]
+
+
+def test_validate_run_txt_from_config_reports_counts(tmp_path) -> None:
+    template_path = tmp_path / "template.xs"
+    grid_path = tmp_path / "parameter_grid.yaml"
+    base_dir = tmp_path / "runs"
+    _write_xs_template(template_path)
+    _write_xs_parameter_grid(grid_path)
+    run_result = create_run_manifest_from_config(
+        {
+            "base_dir": str(base_dir),
+            "strategy_name": "gui-xs",
+            "parameter_grid_path": str(grid_path),
+            "template_path": str(template_path),
+        }
+    )
+    generate_xs_into_run_from_config({"run_path": run_result["run_path"]})
+    txt_dir = tmp_path / "runs" / run_result["run_id"] / "txt"
+    (txt_dir / "gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.txt").write_text(
+        "entry_time,exit_time,side,entry_price,exit_price\n"
+        "2023-03-01T09:00:00,2023-03-01T09:05:00,long,100,120\n",
+        encoding="utf-8",
+    )
+
+    result = validate_run_txt_from_config({"run_path": run_result["run_path"]})
+
+    assert result["total_xs"] == 4
+    assert result["total_txt"] == 1
+    assert result["matched"] == 1
+    assert len(result["missing_txt"]) == 3
+    assert result["parse_failed"] == []
+    assert result["valid_txt"] == ["gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.txt"]
 
 
 def test_manage_forward_status_from_config_updates_status(tmp_path) -> None:

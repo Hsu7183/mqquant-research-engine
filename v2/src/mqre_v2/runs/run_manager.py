@@ -17,6 +17,10 @@ class RunManifest:
     total_param_combinations: int
     xs_generated: bool = False
     xs_count: int = 0
+    txt_validated: bool = False
+    txt_matched: int = 0
+    txt_missing: int = 0
+    txt_parse_failed: int = 0
     notes: str = ""
 
 
@@ -60,6 +64,10 @@ def load_manifest(run_path: str) -> RunManifest:
         total_param_combinations=int(payload["total_param_combinations"]),
         xs_generated=bool(payload.get("xs_generated", False)),
         xs_count=int(payload.get("xs_count", 0)),
+        txt_validated=bool(payload.get("txt_validated", False)),
+        txt_matched=int(payload.get("txt_matched", 0)),
+        txt_missing=int(payload.get("txt_missing", 0)),
+        txt_parse_failed=int(payload.get("txt_parse_failed", 0)),
         notes=str(payload.get("notes", "")),
     )
 
