@@ -21,6 +21,9 @@ class RunManifest:
     txt_matched: int = 0
     txt_missing: int = 0
     txt_parse_failed: int = 0
+    pipeline_completed: bool = False
+    pipeline_total: int = 0
+    pipeline_valid: int = 0
     notes: str = ""
 
 
@@ -68,6 +71,9 @@ def load_manifest(run_path: str) -> RunManifest:
         txt_matched=int(payload.get("txt_matched", 0)),
         txt_missing=int(payload.get("txt_missing", 0)),
         txt_parse_failed=int(payload.get("txt_parse_failed", 0)),
+        pipeline_completed=bool(payload.get("pipeline_completed", False)),
+        pipeline_total=int(payload.get("pipeline_total", 0)),
+        pipeline_valid=int(payload.get("pipeline_valid", 0)),
         notes=str(payload.get("notes", "")),
     )
 

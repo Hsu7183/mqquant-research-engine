@@ -29,6 +29,7 @@ from mqre_v2.pipeline.txt_wfo_pipeline import (
 )
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.runs.run_manager import RunManifest, create_run_directory, write_manifest
+from mqre_v2.runs.run_pipeline import run_pipeline_from_run
 from mqre_v2.runs.run_txt_validator import validate_run_txt
 from mqre_v2.runs.run_xs_batch import generate_xs_into_run
 from mqre_v2.strategy.registry import (
@@ -249,6 +250,22 @@ def validate_run_txt_from_config(config: dict) -> dict:
         "extra_txt": result.extra_txt,
         "parse_failed": result.parse_failed,
         "valid_txt": result.valid_txt,
+    }
+
+
+def run_pipeline_from_run_config(config: dict) -> dict:
+    result = run_pipeline_from_run(
+        run_path=str(config["run_path"]),
+        start_date=_coerce_date(config["start_date"]),
+        end_date=_coerce_date(config["end_date"]),
+        output_filename=str(config.get("output_filename", "ranking.json")),
+    )
+    return {
+        "run_id": result.run_id,
+        "total_strategies": result.total_strategies,
+        "valid_txt": result.valid_txt,
+        "ranking": result.ranking,
+        "output_json_path": result.output_json_path,
     }
 
 
@@ -553,6 +570,7 @@ def _render_optimizer_mode(st: Any) -> None:
         run_path = st.text_input("run_path")
         generate_run_xs_clicked = st.button("產生 XS 到 Run")
         validate_run_txt_clicked = st.button("驗證 TXT 完整性")
+        run_pipeline_clicked = st.button("執行 Run Pipeline")
         output_dir = st.text_input("output_dir", value="outputs/xs_batch")
         generate_xs_clicked = st.button("產生 XS 批次")
         load_grid_clicked = st.button("載入參數空間")
@@ -607,6 +625,21 @@ def _render_optimizer_mode(st: Any) -> None:
             st.error(str(exc))
         else:
             _render_run_txt_validation_result(st, validation_result)
+
+    if run_pipeline_clicked:
+        target_run_path = run_path or _get_session_value(st, "last_run_path", "")
+        try:
+            pipeline_result = run_pipeline_from_run_config(
+                {
+                    "run_path": target_run_path,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_run_pipeline_result(st, pipeline_result)
 
     if generate_xs_clicked:
         try:
@@ -1050,6 +1083,19 @@ def _render_run_txt_validation_result(st: Any, result: dict) -> None:
         pd.DataFrame({"filename": result["parse_failed"][:5]}),
         use_container_width=True,
     )
+
+
+def _render_run_pipeline_result(st: Any, result: dict) -> None:
+    st.subheader("執行 Run Pipeline")
+    st.write(
+        {
+            "total_strategies": result["total_strategies"],
+            "valid_txt": result["valid_txt"],
+            "output_json_path": result["output_json_path"],
+        }
+    )
+    st.subheader("Top 10")
+    st.dataframe(pd.DataFrame(result["ranking"][:10]), use_container_width=True)
 
 
 def _render_xs_batch_result(st: Any, result: dict) -> None:

@@ -37,14 +37,21 @@ def run_txt_wfo_pipeline(
     start_date: date,
     end_date: date,
     gate_config: dict,
+    txt_filenames: list[str] | None = None,
 ) -> list[dict]:
     folder = Path(txt_folder)
     if not folder.is_dir():
         raise NotADirectoryError(f"txt_folder is not a directory: {folder}")
 
+    allowed_names = None
+    if txt_filenames is not None:
+        allowed_names = {Path(filename).name for filename in txt_filenames}
+
     results: list[dict] = []
     for txt_path in sorted(folder.glob("*.txt")):
         if not txt_path.is_file():
+            continue
+        if allowed_names is not None and txt_path.name not in allowed_names:
             continue
 
         strategy_name = txt_path.stem
