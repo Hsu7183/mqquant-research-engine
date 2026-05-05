@@ -8,6 +8,7 @@ from mqre_v2.gui.wfo_app import (
     build_batch_ranking_dataframe,
     build_optimizer_dataframe,
     build_round_dataframe,
+    load_parameter_grid_preview,
     run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
     run_simple_optimizer,
@@ -35,6 +36,18 @@ def _write_challenger_txt(path) -> None:
 
 def _write_broken_txt(path) -> None:
     path.write_text("not,a,valid,trade,file\n1,2,3,4\n", encoding="utf-8")
+
+
+def _write_parameter_grid(path) -> None:
+    path.write_text(
+        """
+strategy_name: demo-grid
+parameters:
+  A: [1, 2]
+  B: [10, 20, 30]
+""",
+        encoding="utf-8",
+    )
 
 
 def _config(txt_path) -> dict:
@@ -346,3 +359,17 @@ def test_run_batch_txt_ranking_bad_file_does_not_interrupt(tmp_path) -> None:
     assert by_name["bad"]["passed"] is False
     assert by_name["bad"]["score"] == 0.0
     assert by_name["bad"]["fail_reason"]
+
+
+def test_load_parameter_grid_preview(tmp_path) -> None:
+    path = tmp_path / "parameter_grid.yaml"
+    _write_parameter_grid(path)
+
+    preview = load_parameter_grid_preview(str(path))
+
+    assert preview["strategy_name"] == "demo-grid"
+    assert preview["total_combinations"] == 6
+    assert preview["parameters"] == [
+        {"name": "A", "candidate_count": 2},
+        {"name": "B", "candidate_count": 3},
+    ]

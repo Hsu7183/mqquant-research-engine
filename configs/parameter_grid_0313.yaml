@@ -1,0 +1,10 @@
+strategy_name: "0313plus"
+parameters:
+  EntryBufferPts: [0, 1, 2]
+  DonBufferPts: [0, 1, 2]
+  ATRStopK: [1.0, 1.5, 2.0]
+  ATRTakeProfitK: [1.5, 2.0, 2.5]
+  TrailStartPctAnchor: [0.3, 0.5]
+  TrailGivePctAnchor: [0.2, 0.3]
+  TimeStopBars: [20, 30]
+  AnchorBackPct: [0.2, 0.3]

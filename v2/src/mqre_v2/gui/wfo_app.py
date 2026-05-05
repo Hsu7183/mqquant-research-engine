@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from mqre_v2.optimizer.parameter_grid import expand_parameter_grid, load_parameter_grid
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.validation.decision import compare_baseline_challenger, score_wfo_summary
 from mqre_v2.validation.wfo import (
@@ -150,6 +151,22 @@ def run_simple_optimizer(config: dict) -> list[dict]:
     for rank, result in enumerate(results, start=1):
         result["rank"] = rank
     return results
+
+
+def load_parameter_grid_preview(path: str) -> dict:
+    grid = load_parameter_grid(path)
+    combinations = expand_parameter_grid(grid)
+    return {
+        "strategy_name": grid.strategy_name,
+        "parameters": [
+            {
+                "name": name,
+                "candidate_count": len(values),
+            }
+            for name, values in grid.parameters.items()
+        ],
+        "total_combinations": len(combinations),
+    }
 
 
 def run_batch_txt_ranking_from_config(config: dict) -> list[dict]:
@@ -331,7 +348,21 @@ def _render_optimizer_mode(st: Any) -> None:
         slippage_points_range = st.text_input("slippage_points_range", value="1,2,3,4")
         fee_points_range = st.text_input("fee_points_range", value="0,1,2")
         min_test_pf_range = st.text_input("min_test_pf_range", value="1.0,1.1,1.2")
+        st.subheader("策略參數空間")
+        parameter_grid_path = st.text_input(
+            "parameter_grid_path",
+            value="configs/parameter_grid_0313.yaml",
+        )
+        load_grid_clicked = st.button("載入參數空間")
         run_clicked = st.button("執行 Optimizer")
+
+    if load_grid_clicked:
+        try:
+            preview = load_parameter_grid_preview(parameter_grid_path)
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_parameter_grid_preview(st, preview)
 
     if not run_clicked:
         return
@@ -491,6 +522,17 @@ def _render_optimizer_result(st: Any, results: list[dict]) -> None:
         file_name="optimizer_report.json",
         mime="application/json",
     )
+
+
+def _render_parameter_grid_preview(st: Any, preview: dict) -> None:
+    st.subheader("策略參數空間")
+    st.write(
+        {
+            "strategy_name": preview["strategy_name"],
+            "total_combinations": preview["total_combinations"],
+        }
+    )
+    st.dataframe(pd.DataFrame(preview["parameters"]), use_container_width=True)
 
 
 def _render_batch_ranking_result(st: Any, results: list[dict]) -> None:
