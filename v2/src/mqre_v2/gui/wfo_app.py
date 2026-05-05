@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from mqre_v2.automation.auto_research import AutoResearchConfig, run_auto_research
+from mqre_v2.decision.recommendation import export_recommendation_report
 from mqre_v2.forward.forward_evaluator import (
     ForwardEvaluationConfig,
     run_forward_evaluation,
@@ -269,6 +270,16 @@ def run_pipeline_from_run_config(config: dict) -> dict:
     }
 
 
+def generate_promotion_recommendation_from_config(config: dict) -> dict:
+    return export_recommendation_report(
+        ranking_report_path=str(config["ranking_report_path"]),
+        output_path=str(config["output_recommendation_path"]),
+        min_score=_get_float(config, "min_score", 100.0),
+        min_pass_rate=_get_float(config, "min_pass_rate", 0.6),
+        max_mdd=_get_float(config, "max_mdd", 15000.0),
+    )
+
+
 def generate_xs_batch_from_config(config: dict) -> dict:
     paths = generate_xs_batch(
         template_path=str(config["template_path"]),
@@ -457,6 +468,7 @@ def main() -> None:
     auto_research_mode = "Auto Research Pipeline"
     forward_evaluation_mode = "Forward Evaluation"
     strategy_registry_mode = "Strategy Registry"
+    promotion_recommendation_mode = "Promotion Recommendation"
     with st.sidebar:
         mode = st.selectbox(
             "mode",
@@ -469,6 +481,7 @@ def main() -> None:
                 auto_research_mode,
                 forward_evaluation_mode,
                 strategy_registry_mode,
+                promotion_recommendation_mode,
             ],
         )
 
@@ -486,8 +499,10 @@ def main() -> None:
         _render_auto_research_mode(st)
     elif mode == forward_evaluation_mode:
         _render_forward_evaluation_mode(st)
-    else:
+    elif mode == strategy_registry_mode:
         _render_strategy_registry_mode(st)
+    else:
+        _render_promotion_recommendation_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -910,6 +925,46 @@ def _render_strategy_registry_mode(st: Any) -> None:
     _render_strategy_registry_table(st, registry_csv_path, records)
 
 
+def _render_promotion_recommendation_mode(st: Any) -> None:
+    with st.sidebar:
+        ranking_report_path = st.text_input(
+            "ranking_report_path",
+            value="dashboard/sample_ranking.json",
+        )
+        output_recommendation_path = st.text_input(
+            "output_recommendation_path",
+            value="reports/promotion_recommendation.json",
+        )
+        min_score = st.number_input("min_score", value=100.0)
+        min_pass_rate = st.number_input(
+            "min_pass_rate",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.6,
+        )
+        max_mdd = st.number_input("max_mdd", min_value=0.0, value=15000.0)
+        run_clicked = st.button("產生升級建議")
+
+    if not run_clicked:
+        return
+
+    try:
+        payload = generate_promotion_recommendation_from_config(
+            {
+                "ranking_report_path": ranking_report_path,
+                "output_recommendation_path": output_recommendation_path,
+                "min_score": min_score,
+                "min_pass_rate": min_pass_rate,
+                "max_mdd": max_mdd,
+            }
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_promotion_recommendation_result(st, payload)
+
+
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
     return {
         "start_date": st.date_input("start_date", value=date(2020, 1, 1)),
@@ -1270,6 +1325,25 @@ def _render_strategy_registry_table(
     st.subheader("Strategy Registry")
     st.write({"registry_csv_path": registry_csv_path})
     st.dataframe(pd.DataFrame(records), use_container_width=True)
+
+
+def _render_promotion_recommendation_result(st: Any, payload: dict) -> None:
+    recommendation = payload["recommendation"]
+    st.subheader("Promotion Recommendation")
+    st.write(
+        {
+            "recommend_promote": recommendation["recommend_promote"],
+            "strategy_name": recommendation["strategy_name"],
+            "score": recommendation["score"],
+            "reason": recommendation["reason"],
+            "requires_human_review": recommendation["requires_human_review"],
+        }
+    )
+    st.subheader("Risk Warnings")
+    st.dataframe(
+        pd.DataFrame({"warning": recommendation["risk_warnings"]}),
+        use_container_width=True,
+    )
 
 
 def _build_forward_record_from_pipeline_result(result: dict) -> ForwardTestRecord:

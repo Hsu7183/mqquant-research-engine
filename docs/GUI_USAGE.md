@@ -59,6 +59,10 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 
    從 Forward Log 匯入 `promoted` 策略，登錄為正式策略版本 `active`，並可手動將策略退役為 `retired`。此模式只做版本治理，不會下單。
 
+9. Promotion Recommendation
+
+   讀取標準化 ranking JSON，依分數、pass rate 與 MDD 門檻產生策略升級建議報告。此模式只產生 recommendation，不會自動下單、不會自動切換策略，且 `requires_human_review=True`。
+
 ## 建議實戰流程
 
 1. 用 `parameter_grid` 產生 XS。
@@ -67,7 +71,8 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 4. 用 Forward Test 管理將候選策略切到 `forward_testing`。
 5. 用 Forward Evaluation 產生 `promoted` / `rejected` 判斷。
 6. 用 Strategy Registry 將 `promoted` 策略登錄為 `active`。
-7. 視需要再用 Baseline vs Challenger 做更細的升級決策。
+7. 用 Promotion Recommendation 產生升級建議報告。
+8. 視需要再用 Baseline vs Challenger 做更細的升級決策。
 
 ## 注意事項
 
@@ -76,5 +81,6 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 - 目前不會自動下單。
 - Auto Research Pipeline 是全自動研究，不是全自動交易。
 - Strategy Registry 只登錄 promoted 策略為 active，不代表啟動交易。
+- Promotion Recommendation 只產生建議，不自動下單、不自動切換策略。
 - Level 1～4 目前只做研究、報表、觀察與決策基礎。
 - TXT 格式必須符合標準 TradeRecord 欄位契約。
