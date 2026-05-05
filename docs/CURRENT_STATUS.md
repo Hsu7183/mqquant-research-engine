@@ -2,7 +2,7 @@
 
 ## Test Status
 
-- `python -m pytest -q` = 137 passed
+- `python -m pytest -q` = 150 passed
 
 ## Level 1～4 Mainline
 
@@ -23,6 +23,8 @@ TXT 資料夾
 -> Ranking JSON
 -> TopN
 -> Forward candidate
+-> Forward Evaluation
+-> Strategy Registry active
 ```
 
 ## Completed Modules
@@ -42,6 +44,8 @@ TXT 資料夾
 - WFO JSON Report Exporter
 - Auto Research Pipeline
 - Auto Research CLI
+- Forward Evaluation
+- Strategy Registry
 - Streamlit GUI
 
 ## GUI Modes
@@ -52,10 +56,18 @@ TXT 資料夾
 4. 批量 TXT 排名
 5. Forward Test 管理
 6. Auto Research Pipeline
+7. Forward Evaluation
+8. Strategy Registry
+
+## Level 4 Support
+
+- Forward Evaluation 可將 `forward_testing` 策略評估為 `promoted` / `rejected`。
+- Strategy Registry 可將 `promoted` 策略登錄為 `active`。
+- `active` 只代表正式策略版本治理狀態，不代表下單或啟動交易。
 
 ## Next Steps
 
 1. 將真實 0313 / 1001 / 0807 TXT 接入 Auto Research Pipeline。
 2. 建立 Level 3 決策規則與報表。
-3. 建立 Level 4 forward observation review 流程。
+3. 建立 Level 4 forward observation review 報表。
 4. 保持 01-01-01 baseline immutable。

@@ -12,6 +12,8 @@ from mqre_v2.gui.wfo_app import (
     generate_xs_batch_from_config,
     load_parameter_grid_preview,
     manage_forward_status_from_config,
+    promote_registry_from_config,
+    retire_strategy_from_config,
     run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
     run_simple_optimizer,
@@ -476,3 +478,71 @@ def test_manage_forward_status_from_config_missing_strategy_raises(tmp_path) -> 
                 "notes": "not found",
             }
         )
+
+
+def test_promote_registry_from_config_imports_promoted_strategy(tmp_path) -> None:
+    forward_log_path = tmp_path / "forward_test_log.csv"
+    registry_path = tmp_path / "strategy_registry.csv"
+    append_forward_record(
+        str(forward_log_path),
+        ForwardTestRecord(
+            strategy_name="alpha",
+            txt_path="alpha.txt",
+            status="promoted",
+            created_at="2026-05-06T00:00:00+00:00",
+            updated_at="2026-05-06T00:00:00+00:00",
+            source_score=120.0,
+            source_pass_rate=0.8,
+            source_total_test_net_profit=5000.0,
+            notes="forward evaluation score=120.0",
+        ),
+    )
+
+    records = promote_registry_from_config(
+        {
+            "forward_log_path": str(forward_log_path),
+            "registry_csv_path": str(registry_path),
+        }
+    )
+
+    assert len(records) == 1
+    assert records[0]["strategy_name"] == "alpha"
+    assert records[0]["status"] == "active"
+    assert records[0]["source"] == "forward_log"
+
+
+def test_retire_strategy_from_config_updates_registry(tmp_path) -> None:
+    forward_log_path = tmp_path / "forward_test_log.csv"
+    registry_path = tmp_path / "strategy_registry.csv"
+    append_forward_record(
+        str(forward_log_path),
+        ForwardTestRecord(
+            strategy_name="alpha",
+            txt_path="alpha.txt",
+            status="promoted",
+            created_at="2026-05-06T00:00:00+00:00",
+            updated_at="2026-05-06T00:00:00+00:00",
+            source_score=120.0,
+            source_pass_rate=0.8,
+            source_total_test_net_profit=5000.0,
+            notes="forward evaluation score=120.0",
+        ),
+    )
+    promote_registry_from_config(
+        {
+            "forward_log_path": str(forward_log_path),
+            "registry_csv_path": str(registry_path),
+        }
+    )
+
+    records = retire_strategy_from_config(
+        {
+            "registry_csv_path": str(registry_path),
+            "strategy_name": "alpha",
+            "notes": "retired after review",
+        }
+    )
+
+    assert records[0]["strategy_name"] == "alpha"
+    assert records[0]["status"] == "retired"
+    assert records[0]["notes"] == "retired after review"

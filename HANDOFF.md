@@ -43,6 +43,8 @@ Step5：Forward Test（baseline vs challenger）
 - TXT WFO Pipeline
 - Forward Test Tracking
 - Forward Test 管理 GUI
+- Forward Evaluation
+- Strategy Registry
 - Baseline vs Challenger Decision
 - WFO JSON Report Exporter
 - Auto Research Pipeline
@@ -59,6 +61,8 @@ TXT 資料夾
 -> Ranking JSON
 -> TopN
 -> Forward candidate
+-> Forward Evaluation
+-> Strategy Registry active
 ```
 
 注意：
@@ -67,10 +71,11 @@ TXT 資料夾
 - 目前不接券商
 - 目前不接 XQ API
 - 目前不會自動下單
+- promoted 策略可登錄為 active，但不代表啟動交易
 
 ## GUI
 
-GUI 已有 6 個模式：
+GUI 已有 8 個模式：
 
 1. 單一策略 WFO
 2. Baseline vs Challenger
@@ -78,6 +83,8 @@ GUI 已有 6 個模式：
 4. 批量 TXT 排名
 5. Forward Test 管理
 6. Auto Research Pipeline
+7. Forward Evaluation
+8. Strategy Registry
 
 啟動方式：
 
@@ -93,4 +100,4 @@ run_gui.cmd
 
 ## Test Status
 
-- `python -m pytest -q` = 137 passed
+- `python -m pytest -q` = 150 passed

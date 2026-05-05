@@ -51,13 +51,23 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 
    讀取 TXT 資料夾，自動執行 TXT -> WFO Pipeline -> Ranking JSON -> TopN，並依設定將 Top 1 策略加入 Forward Test `candidate`。這是 Level 1～4 的全自動研究主線，不是全自動交易。
 
+7. Forward Evaluation
+
+   針對 `forward_testing` 狀態策略重新讀取最新 TXT、執行 WFO，依分數門檻自動更新為 `promoted`、`rejected` 或維持觀察中。
+
+8. Strategy Registry
+
+   從 Forward Log 匯入 `promoted` 策略，登錄為正式策略版本 `active`，並可手動將策略退役為 `retired`。此模式只做版本治理，不會下單。
+
 ## 建議實戰流程
 
 1. 用 `parameter_grid` 產生 XS。
 2. 在 XQ 手動回測輸出 TXT。
 3. 使用 Auto Research Pipeline 執行主線流程：TXT 資料夾 -> WFO Pipeline -> Ranking JSON -> TopN -> Forward candidate。
-4. 用 Forward Test 管理更新狀態。
-5. 視需要再用 Baseline vs Challenger 做更細的升級決策。
+4. 用 Forward Test 管理將候選策略切到 `forward_testing`。
+5. 用 Forward Evaluation 產生 `promoted` / `rejected` 判斷。
+6. 用 Strategy Registry 將 `promoted` 策略登錄為 `active`。
+7. 視需要再用 Baseline vs Challenger 做更細的升級決策。
 
 ## 注意事項
 
@@ -65,5 +75,6 @@ python -m streamlit run v2/src/mqre_v2/gui/wfo_app.py
 - 目前不接 XQ API。
 - 目前不會自動下單。
 - Auto Research Pipeline 是全自動研究，不是全自動交易。
+- Strategy Registry 只登錄 promoted 策略為 active，不代表啟動交易。
 - Level 1～4 目前只做研究、報表、觀察與決策基礎。
 - TXT 格式必須符合標準 TradeRecord 欄位契約。

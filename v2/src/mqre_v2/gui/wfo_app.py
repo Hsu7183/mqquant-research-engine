@@ -28,6 +28,11 @@ from mqre_v2.pipeline.txt_wfo_pipeline import (
     run_txt_wfo_pipeline,
 )
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
+from mqre_v2.strategy.registry import (
+    promote_from_forward_log,
+    read_strategy_registry,
+    retire_strategy,
+)
 from mqre_v2.validation.decision import compare_baseline_challenger, score_wfo_summary
 from mqre_v2.validation.wfo import (
     TxtWfoInput,
@@ -210,6 +215,25 @@ def manage_forward_status_from_config(config: dict) -> list[dict]:
     return [record.__dict__ for record in read_forward_records(forward_log_path)]
 
 
+def promote_registry_from_config(config: dict) -> list[dict]:
+    registry_csv_path = str(config["registry_csv_path"])
+    promote_from_forward_log(
+        forward_log_path=str(config["forward_log_path"]),
+        registry_csv_path=registry_csv_path,
+    )
+    return [record.__dict__ for record in read_strategy_registry(registry_csv_path)]
+
+
+def retire_strategy_from_config(config: dict) -> list[dict]:
+    registry_csv_path = str(config["registry_csv_path"])
+    retire_strategy(
+        csv_path=registry_csv_path,
+        strategy_name=str(config["strategy_name"]),
+        notes=str(config.get("notes", "")),
+    )
+    return [record.__dict__ for record in read_strategy_registry(registry_csv_path)]
+
+
 def run_auto_research_from_config(config: dict) -> dict:
     return run_auto_research(
         AutoResearchConfig(
@@ -353,6 +377,7 @@ def main() -> None:
     forward_mode = "Forward Test 管理"
     auto_research_mode = "Auto Research Pipeline"
     forward_evaluation_mode = "Forward Evaluation"
+    strategy_registry_mode = "Strategy Registry"
     with st.sidebar:
         mode = st.selectbox(
             "mode",
@@ -364,6 +389,7 @@ def main() -> None:
                 forward_mode,
                 auto_research_mode,
                 forward_evaluation_mode,
+                strategy_registry_mode,
             ],
         )
 
@@ -379,8 +405,10 @@ def main() -> None:
         _render_forward_management_mode(st)
     elif mode == auto_research_mode:
         _render_auto_research_mode(st)
-    else:
+    elif mode == forward_evaluation_mode:
         _render_forward_evaluation_mode(st)
+    else:
+        _render_strategy_registry_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -689,6 +717,56 @@ def _render_forward_evaluation_mode(st: Any) -> None:
     _render_forward_evaluation_result(st, result)
 
 
+def _render_strategy_registry_mode(st: Any) -> None:
+    with st.sidebar:
+        forward_log_path = st.text_input(
+            "forward_log_path",
+            value="reports/forward_test_log.csv",
+        )
+        registry_csv_path = st.text_input(
+            "registry_csv_path",
+            value="reports/strategy_registry.csv",
+        )
+        import_clicked = st.button("從 Forward Log 匯入 promoted 策略")
+        strategy_name = st.text_input("strategy_name")
+        notes = st.text_area("notes")
+        retire_clicked = st.button("退役策略")
+
+    if import_clicked:
+        try:
+            records = promote_registry_from_config(
+                {
+                    "forward_log_path": forward_log_path,
+                    "registry_csv_path": registry_csv_path,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            st.success("Imported promoted strategies from forward log.")
+            _render_strategy_registry_table(st, registry_csv_path, records)
+        return
+
+    if retire_clicked:
+        try:
+            records = retire_strategy_from_config(
+                {
+                    "registry_csv_path": registry_csv_path,
+                    "strategy_name": strategy_name,
+                    "notes": notes,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Retired {strategy_name}.")
+            _render_strategy_registry_table(st, registry_csv_path, records)
+        return
+
+    records = [record.__dict__ for record in read_strategy_registry(registry_csv_path)]
+    _render_strategy_registry_table(st, registry_csv_path, records)
+
+
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
     return {
         "start_date": st.date_input("start_date", value=date(2020, 1, 1)),
@@ -976,6 +1054,16 @@ def _render_forward_records_table(
 ) -> None:
     st.subheader("Forward Test Log")
     st.write({"forward_log_path": forward_log_path})
+    st.dataframe(pd.DataFrame(records), use_container_width=True)
+
+
+def _render_strategy_registry_table(
+    st: Any,
+    registry_csv_path: str,
+    records: list[dict],
+) -> None:
+    st.subheader("Strategy Registry")
+    st.write({"registry_csv_path": registry_csv_path})
     st.dataframe(pd.DataFrame(records), use_container_width=True)
 
 
