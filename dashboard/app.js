@@ -1,4 +1,10 @@
-const REPORT_URL = "sample_ranking.json";
+const GITHUB_OWNER = "Hsu7183";
+const GITHUB_REPO = "mqquant-research-engine";
+const BRANCH = "main";
+const LATEST_REPORT_PATH = "runs/latest/reports/ranking.json";
+const GITHUB_REPORT_URL =
+  `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${BRANCH}/${LATEST_REPORT_PATH}`;
+const LOCAL_REPORT_URL = "sample_ranking.json";
 
 const fallbackReport = {
   run_id: "20260506_sample_batch001",
@@ -22,17 +28,34 @@ const fallbackReport = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  loadReport(REPORT_URL)
-    .then((report) => {
+  loadLatestReport()
+    .then(({ report, dataSource, sourceUrl }) => {
       validateReportSchema(report);
-      renderDashboard(report);
+      renderDashboard(report, dataSource, sourceUrl);
     })
     .catch((error) => {
       console.warn(error);
-      renderStatus("sample_ranking.json failed to load; using embedded fallback.", true);
-      renderDashboard(fallbackReport);
+      renderStatus("GitHub and local ranking JSON failed; using embedded fallback.", true);
+      renderDashboard(fallbackReport, "Embedded fallback", "inline fallbackReport");
     });
 });
+
+async function loadLatestReport() {
+  try {
+    return {
+      report: await loadReport(GITHUB_REPORT_URL),
+      dataSource: "GitHub",
+      sourceUrl: GITHUB_REPORT_URL,
+    };
+  } catch (githubError) {
+    console.warn("GitHub ranking JSON failed to load; falling back to local sample.", githubError);
+    return {
+      report: await loadReport(LOCAL_REPORT_URL),
+      dataSource: "Local",
+      sourceUrl: LOCAL_REPORT_URL,
+    };
+  }
+}
 
 async function loadReport(url) {
   const response = await fetch(url, { cache: "no-store" });
@@ -92,15 +115,16 @@ function validateRankingItem(item) {
   }
 }
 
-function renderDashboard(report) {
+function renderDashboard(report, dataSource, sourceUrl) {
   const top10 = report.top_10.slice(0, 10);
   document.getElementById("run-id").textContent = `run_id: ${report.run_id}`;
   document.getElementById("generated-at").textContent =
     `generated_at: ${report.generated_at}`;
   document.getElementById("summary").textContent =
     `strategies: ${report.summary.valid_strategies}/${report.summary.total_strategies}`;
+  document.getElementById("data-source").textContent = `data source: ${dataSource}`;
 
-  renderStatus(`Loaded ${top10.length} Top10 strategies from ${REPORT_URL}.`, false);
+  renderStatus(`Loaded ${top10.length} Top10 strategies from ${sourceUrl}.`, false);
   renderTable(top10);
   renderCharts(top10);
 }
