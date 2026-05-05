@@ -11,6 +11,10 @@ from typing import Any
 import pandas as pd
 
 from mqre_v2.automation.auto_research import AutoResearchConfig, run_auto_research
+from mqre_v2.forward.forward_evaluator import (
+    ForwardEvaluationConfig,
+    run_forward_evaluation,
+)
 from mqre_v2.forward.forward_log import (
     ForwardTestRecord,
     append_forward_record,
@@ -223,6 +227,27 @@ def run_auto_research_from_config(config: dict) -> dict:
     )
 
 
+def run_forward_evaluation_from_config(config: dict) -> dict:
+    return run_forward_evaluation(
+        ForwardEvaluationConfig(
+            txt_folder=str(config["txt_folder"]),
+            start_date=_coerce_date(config["start_date"]),
+            end_date=_coerce_date(config["end_date"]),
+            forward_log_path=str(config["forward_log_path"]),
+            promote_threshold_score=_get_float(
+                config,
+                "promote_threshold_score",
+                100.0,
+            ),
+            reject_threshold_score=_get_float(
+                config,
+                "reject_threshold_score",
+                50.0,
+            ),
+        )
+    )
+
+
 def run_batch_txt_ranking_from_config(config: dict) -> list[dict]:
     folder = Path(str(config["txt_folder_path"]))
     if not folder.is_dir():
@@ -327,6 +352,7 @@ def main() -> None:
     batch_mode = "批量 TXT 排名"
     forward_mode = "Forward Test 管理"
     auto_research_mode = "Auto Research Pipeline"
+    forward_evaluation_mode = "Forward Evaluation"
     with st.sidebar:
         mode = st.selectbox(
             "mode",
@@ -337,6 +363,7 @@ def main() -> None:
                 batch_mode,
                 forward_mode,
                 auto_research_mode,
+                forward_evaluation_mode,
             ],
         )
 
@@ -350,8 +377,10 @@ def main() -> None:
         _render_batch_ranking_mode(st)
     elif mode == forward_mode:
         _render_forward_management_mode(st)
-    else:
+    elif mode == auto_research_mode:
         _render_auto_research_mode(st)
+    else:
+        _render_forward_evaluation_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -620,6 +649,46 @@ def _render_auto_research_mode(st: Any) -> None:
     _render_auto_research_result(st, summary)
 
 
+def _render_forward_evaluation_mode(st: Any) -> None:
+    with st.sidebar:
+        txt_folder = st.text_input("txt_folder")
+        start_date = st.date_input("start_date", value=date(2020, 1, 1))
+        end_date = st.date_input("end_date", value=date.today())
+        forward_log_path = st.text_input(
+            "forward_log_path",
+            value="reports/forward_test_log.csv",
+        )
+        promote_threshold_score = st.number_input(
+            "promote_threshold_score",
+            value=100.0,
+        )
+        reject_threshold_score = st.number_input(
+            "reject_threshold_score",
+            value=50.0,
+        )
+        run_clicked = st.button("執行 Forward Evaluation")
+
+    if not run_clicked:
+        return
+
+    try:
+        result = run_forward_evaluation_from_config(
+            {
+                "txt_folder": txt_folder,
+                "start_date": start_date,
+                "end_date": end_date,
+                "forward_log_path": forward_log_path,
+                "promote_threshold_score": promote_threshold_score,
+                "reject_threshold_score": reject_threshold_score,
+            }
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_forward_evaluation_result(st, result)
+
+
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
     return {
         "start_date": st.date_input("start_date", value=date(2020, 1, 1)),
@@ -848,6 +917,20 @@ def _render_auto_research_result(st: Any, summary: dict) -> None:
 
     st.subheader("Top N")
     st.dataframe(pd.DataFrame(summary["top_n"]), use_container_width=True)
+
+
+def _render_forward_evaluation_result(st: Any, result: dict) -> None:
+    st.subheader("Forward Evaluation Summary")
+    st.write({"total_checked": result["total_checked"]})
+
+    st.subheader("Promoted")
+    st.dataframe(pd.DataFrame(result["promoted"]), use_container_width=True)
+
+    st.subheader("Rejected")
+    st.dataframe(pd.DataFrame(result["rejected"]), use_container_width=True)
+
+    st.subheader("Still Testing")
+    st.dataframe(pd.DataFrame(result["still_testing"]), use_container_width=True)
 
 
 def _render_forward_test_controls(
