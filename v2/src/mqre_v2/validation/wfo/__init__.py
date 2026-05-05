@@ -1,5 +1,11 @@
 """Walk-forward optimization validation helpers."""
 
+from mqre_v2.validation.wfo.adapters import (
+    BacktestResult,
+    OptimizerResult,
+    default_evaluate_fn,
+    default_optimize_fn,
+)
 from mqre_v2.validation.wfo.gates import (
     WfoGateConfig,
     evaluate_wfo_round,
@@ -14,11 +20,15 @@ from mqre_v2.validation.wfo.runner import WfoRunResult, run_wfo
 from mqre_v2.validation.wfo.windows import WfoWindow, generate_wfo_windows
 
 __all__ = [
+    "BacktestResult",
+    "OptimizerResult",
     "WfoGateConfig",
     "WfoRoundResult",
     "WfoRunResult",
     "WfoSummary",
     "WfoWindow",
+    "default_evaluate_fn",
+    "default_optimize_fn",
     "evaluate_wfo_round",
     "evaluate_wfo_summary",
     "generate_wfo_windows",
