@@ -1,3 +1,6 @@
+const DASHBOARD_PASSWORD = "mqquant";
+const DASHBOARD_AUTH_KEY = "mqquant_dashboard_authenticated";
+
 const GITHUB_OWNER = "Hsu7183";
 const GITHUB_REPO = "mqquant-research-engine";
 const BRANCH = "main";
@@ -27,7 +30,75 @@ const fallbackReport = {
   all_results: [],
 };
 
+let scoreChart = null;
+let profitChart = null;
+
 document.addEventListener("DOMContentLoaded", () => {
+  bindAccessGate();
+  if (isAuthenticated()) {
+    showDashboard();
+  } else {
+    showAccessGate();
+  }
+});
+
+function bindAccessGate() {
+  const passwordInput = document.getElementById("password-input");
+  const enterButton = document.getElementById("enter-button");
+  const clearButton = document.getElementById("clear-button");
+  const logoutButton = document.getElementById("logout-button");
+
+  enterButton.addEventListener("click", handleLogin);
+  clearButton.addEventListener("click", clearAccess);
+  logoutButton.addEventListener("click", clearAccess);
+  passwordInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      handleLogin();
+    }
+  });
+}
+
+function isAuthenticated() {
+  return localStorage.getItem(DASHBOARD_AUTH_KEY) === "1";
+}
+
+function handleLogin() {
+  const passwordInput = document.getElementById("password-input");
+  const loginError = document.getElementById("login-error");
+  const value = passwordInput.value.trim();
+
+  if (value === DASHBOARD_PASSWORD) {
+    localStorage.setItem(DASHBOARD_AUTH_KEY, "1");
+    loginError.textContent = "";
+    passwordInput.value = "";
+    showDashboard();
+    return;
+  }
+
+  loginError.textContent = "密碼錯誤，請重新輸入";
+  passwordInput.select();
+}
+
+function clearAccess() {
+  localStorage.removeItem(DASHBOARD_AUTH_KEY);
+  document.getElementById("password-input").value = "";
+  document.getElementById("login-error").textContent = "";
+  showAccessGate();
+}
+
+function showAccessGate() {
+  document.getElementById("access-gate").classList.remove("hidden");
+  document.getElementById("dashboard-shell").classList.add("hidden");
+  document.getElementById("password-input").focus();
+}
+
+function showDashboard() {
+  document.getElementById("access-gate").classList.add("hidden");
+  document.getElementById("dashboard-shell").classList.remove("hidden");
+  loadAndRenderDashboard();
+}
+
+function loadAndRenderDashboard() {
   loadLatestReport()
     .then(({ report, dataSource, sourceUrl }) => {
       validateReportSchema(report);
@@ -35,10 +106,10 @@ document.addEventListener("DOMContentLoaded", () => {
     })
     .catch((error) => {
       console.warn(error);
-      renderStatus("GitHub and local ranking JSON failed; using embedded fallback.", true);
-      renderDashboard(fallbackReport, "Embedded fallback", "inline fallbackReport");
+      renderStatus("GitHub 與本地 ranking JSON 皆載入失敗，改用內建備援資料。", true);
+      renderDashboard(fallbackReport, "內建備援", "inline fallbackReport");
     });
-});
+}
 
 async function loadLatestReport() {
   try {
@@ -51,7 +122,7 @@ async function loadLatestReport() {
     console.warn("GitHub ranking JSON failed to load; falling back to local sample.", githubError);
     return {
       report: await loadReport(LOCAL_REPORT_URL),
-      dataSource: "Local",
+      dataSource: "本地範例",
       sourceUrl: LOCAL_REPORT_URL,
     };
   }
@@ -117,14 +188,13 @@ function validateRankingItem(item) {
 
 function renderDashboard(report, dataSource, sourceUrl) {
   const top10 = report.top_10.slice(0, 10);
-  document.getElementById("run-id").textContent = `run_id: ${report.run_id}`;
-  document.getElementById("generated-at").textContent =
-    `generated_at: ${report.generated_at}`;
+  document.getElementById("run-id").textContent = report.run_id;
+  document.getElementById("generated-at").textContent = formatDateTime(report.generated_at);
   document.getElementById("summary").textContent =
-    `strategies: ${report.summary.valid_strategies}/${report.summary.total_strategies}`;
-  document.getElementById("data-source").textContent = `data source: ${dataSource}`;
+    `${report.summary.valid_strategies} / ${report.summary.total_strategies}`;
+  document.getElementById("data-source").textContent = dataSource;
 
-  renderStatus(`Loaded ${top10.length} Top10 strategies from ${sourceUrl}.`, false);
+  renderStatus(`已載入 ${top10.length} 筆 Top10 策略資料：${sourceUrl}`, false);
   renderTable(top10);
   renderCharts(top10);
 }
@@ -162,24 +232,36 @@ function renderTable(rows) {
 
 function renderCharts(rows) {
   if (!window.Chart) {
-    renderStatus("Chart.js failed to load. Table data is still available.", true);
+    renderStatus("Chart.js 載入失敗，仍可查看排行榜表格。", true);
     return;
   }
 
   const labels = rows.map((item) => `#${item.rank} ${shortName(item.strategy_name)}`);
-  renderBarChart("score-chart", labels, rows.map((item) => item.score), "Score", "#1f6feb");
-  renderBarChart(
+  scoreChart = renderBarChart(
+    "score-chart",
+    labels,
+    rows.map((item) => item.score),
+    "分數",
+    "#2563eb",
+    scoreChart,
+  );
+  profitChart = renderBarChart(
     "profit-chart",
     labels,
     rows.map((item) => item.total_test_net_profit),
-    "Total Profit",
-    "#16833a",
+    "總獲利",
+    "#10b981",
+    profitChart,
   );
 }
 
-function renderBarChart(canvasId, labels, values, label, color) {
+function renderBarChart(canvasId, labels, values, label, color, existingChart) {
+  if (existingChart) {
+    existingChart.destroy();
+  }
+
   const canvas = document.getElementById(canvasId);
-  new Chart(canvas, {
+  return new Chart(canvas, {
     type: "bar",
     data: {
       labels,
@@ -188,7 +270,8 @@ function renderBarChart(canvasId, labels, values, label, color) {
           label,
           data: values,
           backgroundColor: color,
-          borderRadius: 4,
+          borderRadius: 6,
+          maxBarThickness: 42,
         },
       ],
     },
@@ -201,12 +284,19 @@ function renderBarChart(canvasId, labels, values, label, color) {
       scales: {
         x: {
           ticks: {
-            maxRotation: 45,
+            autoSkip: false,
+            maxRotation: 30,
             minRotation: 0,
+          },
+          grid: {
+            display: false,
           },
         },
         y: {
           beginAtZero: true,
+          grid: {
+            color: "#eef2f7",
+          },
         },
       },
     },
@@ -214,24 +304,35 @@ function renderBarChart(canvasId, labels, values, label, color) {
 }
 
 function shortName(value) {
-  return value.length > 18 ? `${value.slice(0, 18)}...` : value;
+  return value.length > 16 ? `${value.slice(0, 16)}...` : value;
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("zh-TW", {
     maximumFractionDigits: 2,
   }).format(value);
 }
 
 function formatMoney(value) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("zh-TW", {
     maximumFractionDigits: 0,
   }).format(value);
 }
 
 function formatPercent(value) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("zh-TW", {
     style: "percent",
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+function formatDateTime(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("zh-TW", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
 }
