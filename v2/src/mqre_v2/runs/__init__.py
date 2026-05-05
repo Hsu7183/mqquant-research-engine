@@ -6,10 +6,12 @@ from mqre_v2.runs.run_manager import (
     load_manifest,
     write_manifest,
 )
+from mqre_v2.runs.run_xs_batch import generate_xs_into_run
 
 __all__ = [
     "RunManifest",
     "create_run_directory",
+    "generate_xs_into_run",
     "load_manifest",
     "write_manifest",
 ]

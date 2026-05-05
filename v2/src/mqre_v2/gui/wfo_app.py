@@ -29,6 +29,7 @@ from mqre_v2.pipeline.txt_wfo_pipeline import (
 )
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.runs.run_manager import RunManifest, create_run_directory, write_manifest
+from mqre_v2.runs.run_xs_batch import generate_xs_into_run
 from mqre_v2.strategy.registry import (
     promote_from_forward_log,
     read_strategy_registry,
@@ -219,6 +220,20 @@ def create_run_manifest_from_config(config: dict) -> dict:
         "run_path": run_path,
         "total_param_combinations": total_combinations,
         "manifest": manifest.__dict__,
+    }
+
+
+def generate_xs_into_run_from_config(config: dict) -> dict:
+    run_path = str(config["run_path"])
+    output_paths = generate_xs_into_run(
+        run_path=run_path,
+        overwrite=bool(config.get("overwrite", False)),
+    )
+    return {
+        "run_path": run_path,
+        "xs_count": len(output_paths),
+        "paths": output_paths,
+        "filenames": [Path(path).name for path in output_paths],
     }
 
 
@@ -520,6 +535,8 @@ def _render_optimizer_mode(st: Any) -> None:
         st.subheader("建立 Run 批次")
         base_dir = st.text_input("base_dir", value="runs")
         create_run_clicked = st.button("建立 Run")
+        run_path = st.text_input("run_path")
+        generate_run_xs_clicked = st.button("產生 XS 到 Run")
         output_dir = st.text_input("output_dir", value="outputs/xs_batch")
         generate_xs_clicked = st.button("產生 XS 批次")
         load_grid_clicked = st.button("載入參數空間")
@@ -546,7 +563,21 @@ def _render_optimizer_mode(st: Any) -> None:
         except Exception as exc:
             st.error(str(exc))
         else:
+            _set_session_value(st, "last_run_path", run_result["run_path"])
             _render_run_manifest_result(st, run_result)
+
+    if generate_run_xs_clicked:
+        target_run_path = run_path or _get_session_value(st, "last_run_path", "")
+        try:
+            xs_result = generate_xs_into_run_from_config(
+                {
+                    "run_path": target_run_path,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_run_xs_batch_result(st, xs_result)
 
     if generate_xs_clicked:
         try:
@@ -953,6 +984,20 @@ def _render_run_manifest_result(st: Any, result: dict) -> None:
         }
     )
     st.json(result["manifest"])
+
+
+def _render_run_xs_batch_result(st: Any, result: dict) -> None:
+    st.subheader("產生 XS 到 Run")
+    st.write(
+        {
+            "run_path": result["run_path"],
+            "xs_count": result["xs_count"],
+        }
+    )
+    st.dataframe(
+        pd.DataFrame({"filename": result["filenames"][:5]}),
+        use_container_width=True,
+    )
 
 
 def _render_xs_batch_result(st: Any, result: dict) -> None:

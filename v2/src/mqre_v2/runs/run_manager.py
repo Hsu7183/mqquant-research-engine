@@ -15,6 +15,8 @@ class RunManifest:
     parameter_grid_path: str
     template_path: str
     total_param_combinations: int
+    xs_generated: bool = False
+    xs_count: int = 0
     notes: str = ""
 
 
@@ -56,6 +58,8 @@ def load_manifest(run_path: str) -> RunManifest:
         parameter_grid_path=str(payload["parameter_grid_path"]),
         template_path=str(payload["template_path"]),
         total_param_combinations=int(payload["total_param_combinations"]),
+        xs_generated=bool(payload.get("xs_generated", False)),
+        xs_count=int(payload.get("xs_count", 0)),
         notes=str(payload.get("notes", "")),
     )
 
