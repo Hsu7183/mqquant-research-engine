@@ -43,6 +43,10 @@ Thumbs.db
 # Keep v2 skeleton placeholders trackable
 !v2/runs/
 !v2/runs/.gitkeep
+!v2/src/mqre_v2/runs/
+!v2/src/mqre_v2/runs/*.py
+!v2/tests/runs/
+!v2/tests/runs/*.py
 !v2/data/samples/
 !v2/data/samples/.gitkeep
 !v2/data/schemas/

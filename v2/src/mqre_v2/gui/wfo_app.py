@@ -28,6 +28,7 @@ from mqre_v2.pipeline.txt_wfo_pipeline import (
     run_txt_wfo_pipeline,
 )
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
+from mqre_v2.runs.run_manager import RunManifest, create_run_directory, write_manifest
 from mqre_v2.strategy.registry import (
     promote_from_forward_log,
     read_strategy_registry,
@@ -187,6 +188,37 @@ def load_parameter_grid_preview(path: str) -> dict:
             for name, values in grid.parameters.items()
         ],
         "total_combinations": len(combinations),
+    }
+
+
+def create_run_manifest_from_config(config: dict) -> dict:
+    parameter_grid_path = str(config["parameter_grid_path"])
+    template_path = str(config["template_path"])
+    strategy_name = str(config["strategy_name"])
+
+    grid = load_parameter_grid(parameter_grid_path)
+    total_combinations = len(expand_parameter_grid(grid))
+    run_path = create_run_directory(
+        base_dir=str(config.get("base_dir", "runs")),
+        strategy_name=strategy_name,
+    )
+    run_id = Path(run_path).name
+    manifest = RunManifest(
+        run_id=run_id,
+        strategy_name=strategy_name,
+        created_at=_generated_at(),
+        parameter_grid_path=parameter_grid_path,
+        template_path=template_path,
+        total_param_combinations=total_combinations,
+        notes=str(config.get("notes", "")),
+    )
+    write_manifest(run_path, manifest)
+
+    return {
+        "run_id": run_id,
+        "run_path": run_path,
+        "total_param_combinations": total_combinations,
+        "manifest": manifest.__dict__,
     }
 
 
@@ -485,6 +517,9 @@ def _render_optimizer_mode(st: Any) -> None:
             "template_path",
             value="templates/xs/0313plus_template.xs",
         )
+        st.subheader("建立 Run 批次")
+        base_dir = st.text_input("base_dir", value="runs")
+        create_run_clicked = st.button("建立 Run")
         output_dir = st.text_input("output_dir", value="outputs/xs_batch")
         generate_xs_clicked = st.button("產生 XS 批次")
         load_grid_clicked = st.button("載入參數空間")
@@ -497,6 +532,21 @@ def _render_optimizer_mode(st: Any) -> None:
             st.error(str(exc))
         else:
             _render_parameter_grid_preview(st, preview)
+
+    if create_run_clicked:
+        try:
+            run_result = create_run_manifest_from_config(
+                {
+                    "base_dir": base_dir,
+                    "strategy_name": strategy_name,
+                    "parameter_grid_path": parameter_grid_path,
+                    "template_path": template_path,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_run_manifest_result(st, run_result)
 
     if generate_xs_clicked:
         try:
@@ -891,6 +941,18 @@ def _render_parameter_grid_preview(st: Any, preview: dict) -> None:
         }
     )
     st.dataframe(pd.DataFrame(preview["parameters"]), use_container_width=True)
+
+
+def _render_run_manifest_result(st: Any, result: dict) -> None:
+    st.subheader("建立 Run 批次")
+    st.write(
+        {
+            "run_id": result["run_id"],
+            "run_path": result["run_path"],
+            "total_param_combinations": result["total_param_combinations"],
+        }
+    )
+    st.json(result["manifest"])
 
 
 def _render_xs_batch_result(st: Any, result: dict) -> None:

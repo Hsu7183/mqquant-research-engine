@@ -9,6 +9,7 @@ from mqre_v2.gui.wfo_app import (
     build_batch_ranking_dataframe,
     build_optimizer_dataframe,
     build_round_dataframe,
+    create_run_manifest_from_config,
     generate_xs_batch_from_config,
     load_parameter_grid_preview,
     manage_forward_status_from_config,
@@ -445,6 +446,30 @@ def test_generate_xs_batch_from_config(tmp_path) -> None:
     assert result["generated_count"] == 4
     assert len(result["paths"]) == 4
     assert result["filenames"][0] == "gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.xs"
+
+
+def test_create_run_manifest_from_config_creates_manifest_only(tmp_path) -> None:
+    template_path = tmp_path / "template.xs"
+    grid_path = tmp_path / "parameter_grid.yaml"
+    base_dir = tmp_path / "runs"
+    _write_xs_template(template_path)
+    _write_xs_parameter_grid(grid_path)
+
+    result = create_run_manifest_from_config(
+        {
+            "base_dir": str(base_dir),
+            "strategy_name": "gui-xs",
+            "parameter_grid_path": str(grid_path),
+            "template_path": str(template_path),
+        }
+    )
+
+    run_path = base_dir / result["run_id"]
+    assert result["run_id"].endswith("gui-xs_batch001")
+    assert result["total_param_combinations"] == 4
+    assert (run_path / "manifest.json").is_file()
+    assert (run_path / "xs").is_dir()
+    assert list((run_path / "xs").iterdir()) == []
 
 
 def test_manage_forward_status_from_config_updates_status(tmp_path) -> None:
