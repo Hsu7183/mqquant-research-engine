@@ -3,9 +3,12 @@ from datetime import date
 import pytest
 
 from mqre_v2.gui.wfo_app import (
+    BATCH_RANKING_COLUMNS,
     OPTIMIZER_TABLE_COLUMNS,
+    build_batch_ranking_dataframe,
     build_optimizer_dataframe,
     build_round_dataframe,
+    run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
     run_simple_optimizer,
     run_txt_wfo_from_config,
@@ -28,6 +31,10 @@ def _write_challenger_txt(path) -> None:
         "2023-03-02T09:00:00,2023-03-02T09:05:00,long,140,130\n",
         encoding="utf-8",
     )
+
+
+def _write_broken_txt(path) -> None:
+    path.write_text("not,a,valid,trade,file\n1,2,3,4\n", encoding="utf-8")
 
 
 def _config(txt_path) -> dict:
@@ -83,6 +90,23 @@ def _optimizer_config(txt_path) -> dict:
         "slippage_points_range": "1,2",
         "fee_points_range": "0,1",
         "min_test_pf_range": "1.0,1.1",
+    }
+
+
+def _batch_config(folder_path) -> dict:
+    return {
+        "txt_folder_path": str(folder_path),
+        "file_pattern": "*.txt",
+        "start_date": date(2023, 1, 1),
+        "end_date": date(2023, 3, 31),
+        "train_months": 1,
+        "gap_months": 1,
+        "test_months": 1,
+        "step_months": 1,
+        "min_test_trade_count": 1,
+        "max_test_mdd": 15000.0,
+        "min_test_pf": 1.05,
+        "min_pass_rate": 0.6,
     }
 
 
@@ -268,3 +292,57 @@ def test_run_simple_optimizer_sorts_by_score_desc(tmp_path) -> None:
     assert results[0]["rank"] == 1
     assert results[0]["slippage"] == pytest.approx(1.0)
     assert results[0]["fee"] == pytest.approx(0.0)
+
+
+def test_run_batch_txt_ranking_reads_multiple_txts(tmp_path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+    _write_challenger_txt(tmp_path / "challenger.txt")
+
+    results = run_batch_txt_ranking_from_config(_batch_config(tmp_path))
+
+    assert len(results) == 2
+    assert {result["strategy_name"] for result in results} == {"baseline", "challenger"}
+
+
+def test_run_batch_txt_ranking_contains_score_and_sorted_desc(tmp_path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+    _write_challenger_txt(tmp_path / "challenger.txt")
+
+    results = run_batch_txt_ranking_from_config(_batch_config(tmp_path))
+    scores = [result["score"] for result in results]
+
+    assert all("score" in result for result in results)
+    assert scores == sorted(scores, reverse=True)
+    assert results[0]["strategy_name"] == "challenger"
+
+
+def test_build_batch_ranking_dataframe_columns(tmp_path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+    _write_challenger_txt(tmp_path / "challenger.txt")
+
+    results = run_batch_txt_ranking_from_config(_batch_config(tmp_path))
+    df = build_batch_ranking_dataframe(results)
+
+    assert list(df.columns) == BATCH_RANKING_COLUMNS
+    assert len(df) == 2
+
+
+def test_run_batch_txt_ranking_invalid_folder_raises(tmp_path) -> None:
+    missing_folder = tmp_path / "missing"
+
+    with pytest.raises(NotADirectoryError):
+        run_batch_txt_ranking_from_config(_batch_config(missing_folder))
+
+
+def test_run_batch_txt_ranking_bad_file_does_not_interrupt(tmp_path) -> None:
+    _write_sample_txt(tmp_path / "good.txt")
+    _write_broken_txt(tmp_path / "bad.txt")
+
+    results = run_batch_txt_ranking_from_config(_batch_config(tmp_path))
+    by_name = {result["strategy_name"]: result for result in results}
+
+    assert len(results) == 2
+    assert by_name["good"]["passed"] is True
+    assert by_name["bad"]["passed"] is False
+    assert by_name["bad"]["score"] == 0.0
+    assert by_name["bad"]["fail_reason"]

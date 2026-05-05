@@ -5,6 +5,7 @@ import math
 from dataclasses import replace
 from datetime import date, datetime, timezone
 from itertools import product
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -38,6 +39,24 @@ OPTIMIZER_TABLE_COLUMNS = [
     "pass_rate",
     "max_test_mdd",
     "average_test_pf",
+    "score",
+]
+
+BATCH_RANKING_COLUMNS = [
+    "rank",
+    "strategy_name",
+    "txt_path",
+    "total_rounds",
+    "passed_rounds",
+    "failed_rounds",
+    "pass_rate",
+    "total_test_net_profit",
+    "average_test_net_profit",
+    "max_test_mdd",
+    "average_test_pf",
+    "total_test_trade_count",
+    "passed",
+    "fail_reason",
     "score",
 ]
 
@@ -133,6 +152,61 @@ def run_simple_optimizer(config: dict) -> list[dict]:
     return results
 
 
+def run_batch_txt_ranking_from_config(config: dict) -> list[dict]:
+    folder = Path(str(config["txt_folder_path"]))
+    if not folder.is_dir():
+        raise NotADirectoryError(f"txt_folder_path is not a directory: {folder}")
+
+    file_pattern = str(config.get("file_pattern", "*.txt"))
+    txt_paths = sorted(path for path in folder.glob(file_pattern) if path.is_file())
+
+    results: list[dict] = []
+    for txt_path in txt_paths:
+        strategy_name = txt_path.stem
+        try:
+            wfo_result = _run_wfo_for_txt(
+                txt_path=str(txt_path),
+                strategy_name=strategy_name,
+                config=config,
+            )
+            payload = wfo_run_result_to_dict(wfo_result)
+            summary = wfo_result.summary
+            score = score_wfo_summary(summary)
+
+            result = {
+                "rank": 0,
+                "strategy_name": strategy_name,
+                "txt_path": str(txt_path),
+                "total_rounds": summary.total_rounds,
+                "passed_rounds": summary.passed_rounds,
+                "failed_rounds": summary.failed_rounds,
+                "pass_rate": _safe_number(summary.pass_rate),
+                "total_test_net_profit": _safe_number(summary.total_test_net_profit),
+                "average_test_net_profit": _safe_number(summary.average_test_net_profit),
+                "max_test_mdd": _safe_number(summary.max_test_mdd),
+                "average_test_pf": _safe_number(summary.average_test_pf),
+                "total_test_trade_count": summary.total_test_trade_count,
+                "passed": wfo_result.passed,
+                "fail_reason": wfo_result.fail_reason,
+                "score": _safe_number(score),
+                "summary": payload["summary"],
+                "round_results": payload["round_results"],
+            }
+        except Exception as exc:
+            result = _failed_batch_result(
+                strategy_name=strategy_name,
+                txt_path=txt_path,
+                fail_reason=str(exc),
+            )
+
+        results.append(result)
+
+    results.sort(key=lambda item: float(item["score"]), reverse=True)
+    for rank, result in enumerate(results, start=1):
+        result["rank"] = rank
+    return results
+
+
 def build_optimizer_dataframe(results: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(results)
     if df.empty:
@@ -145,6 +219,12 @@ def build_optimizer_dataframe(results: list[dict]) -> pd.DataFrame:
             errors="coerce",
         )
     return df
+
+
+def build_batch_ranking_dataframe(results: list[dict]) -> pd.DataFrame:
+    if not results:
+        return pd.DataFrame(columns=BATCH_RANKING_COLUMNS)
+    return pd.DataFrame(results)[BATCH_RANKING_COLUMNS]
 
 
 def build_round_dataframe(round_results: list | tuple) -> pd.DataFrame:
@@ -173,15 +253,18 @@ def main() -> None:
     single_mode = "單一策略 WFO"
     comparison_mode = "Baseline vs Challenger"
     optimizer_mode = "⭐ Optimizer（新增）"
+    batch_mode = "批量 TXT 排名"
     with st.sidebar:
-        mode = st.selectbox("mode", [single_mode, comparison_mode, optimizer_mode])
+        mode = st.selectbox("mode", [single_mode, comparison_mode, optimizer_mode, batch_mode])
 
     if mode == single_mode:
         _render_single_wfo_mode(st)
     elif mode == comparison_mode:
         _render_baseline_challenger_mode(st)
-    else:
+    elif mode == optimizer_mode:
         _render_optimizer_mode(st)
+    else:
+        _render_batch_ranking_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -270,6 +353,29 @@ def _render_optimizer_mode(st: Any) -> None:
         return
 
     _render_optimizer_result(st, results)
+
+
+def _render_batch_ranking_mode(st: Any) -> None:
+    with st.sidebar:
+        txt_folder_path = st.text_input("txt_folder_path")
+        file_pattern = st.text_input("file_pattern", value="*.txt")
+        config = {
+            "txt_folder_path": txt_folder_path,
+            "file_pattern": file_pattern,
+            **_wfo_parameter_inputs(st),
+        }
+        run_clicked = st.button("執行批量排名")
+
+    if not run_clicked:
+        return
+
+    try:
+        results = run_batch_txt_ranking_from_config(config)
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_batch_ranking_result(st, results)
 
 
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
@@ -383,6 +489,50 @@ def _render_optimizer_result(st: Any, results: list[dict]) -> None:
         "下載 Optimizer JSON",
         data=json.dumps(optimizer_payload, ensure_ascii=False, indent=2, allow_nan=False),
         file_name="optimizer_report.json",
+        mime="application/json",
+    )
+
+
+def _render_batch_ranking_result(st: Any, results: list[dict]) -> None:
+    if not results:
+        st.warning("No TXT files matched the selected pattern.")
+        return
+
+    payload = {
+        "generated_at": _generated_at(),
+        "results": results,
+    }
+    table = build_batch_ranking_dataframe(results)
+
+    st.subheader("策略排行榜")
+    st.dataframe(table, use_container_width=True)
+
+    st.subheader("Top 10")
+    st.dataframe(table.head(10), use_container_width=True)
+
+    top_result = results[0]
+    st.subheader("第一名策略")
+    st.write(
+        {
+            "strategy_name": top_result["strategy_name"],
+            "txt_path": top_result["txt_path"],
+            "score": top_result["score"],
+            "total_test_net_profit": top_result["total_test_net_profit"],
+            "pass_rate": top_result["pass_rate"],
+            "passed": top_result["passed"],
+            "fail_reason": top_result["fail_reason"],
+        }
+    )
+
+    if top_result["round_results"]:
+        _render_round_charts(st, top_result["round_results"])
+    else:
+        st.warning("第一名策略沒有可顯示的 WFO round results。")
+
+    st.download_button(
+        "下載批量排名 JSON",
+        data=json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+        file_name="batch_txt_ranking_report.json",
         mime="application/json",
     )
 
@@ -517,6 +667,43 @@ def _build_cost_adjusted_evaluate_fn(
         )
 
     return wrapped
+
+
+def _failed_batch_result(strategy_name: str, txt_path: Path, fail_reason: str) -> dict:
+    summary = _empty_summary_dict()
+    return {
+        "rank": 0,
+        "strategy_name": strategy_name,
+        "txt_path": str(txt_path),
+        "total_rounds": 0,
+        "passed_rounds": 0,
+        "failed_rounds": 0,
+        "pass_rate": 0.0,
+        "total_test_net_profit": 0.0,
+        "average_test_net_profit": 0.0,
+        "max_test_mdd": 0.0,
+        "average_test_pf": 0.0,
+        "total_test_trade_count": 0,
+        "passed": False,
+        "fail_reason": fail_reason,
+        "score": 0.0,
+        "summary": summary,
+        "round_results": [],
+    }
+
+
+def _empty_summary_dict() -> dict[str, float | int]:
+    return {
+        "total_rounds": 0,
+        "passed_rounds": 0,
+        "failed_rounds": 0,
+        "pass_rate": 0.0,
+        "total_test_net_profit": 0.0,
+        "average_test_net_profit": 0.0,
+        "max_test_mdd": 0.0,
+        "average_test_pf": 0.0,
+        "total_test_trade_count": 0,
+    }
 
 
 def _generated_at() -> str:
