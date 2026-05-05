@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
@@ -41,14 +42,9 @@ def run_pipeline_from_run(
     )
 
     output_path = root / "reports" / output_filename
+    report_rows = [_to_report_row(item) for item in ranking]
     export_json_report(
-        {
-            "run_id": manifest.run_id,
-            "total_strategies": len(ranking),
-            "valid_txt": len(validation.valid_txt),
-            "top_10": ranking[:10],
-            "ranking": ranking,
-        },
+        _build_report_payload(manifest.run_id, report_rows),
         str(output_path),
     )
 
@@ -67,3 +63,37 @@ def run_pipeline_from_run(
         ranking=ranking,
         output_json_path=str(output_path),
     )
+
+
+def _build_report_payload(run_id: str, ranking: list[dict]) -> dict:
+    return {
+        "run_id": run_id,
+        "summary": {
+            "total_strategies": len(ranking),
+            "valid_strategies": len(ranking),
+        },
+        "top_10": ranking[:10],
+        "all_results": ranking,
+    }
+
+
+def _to_report_row(item: dict) -> dict:
+    return {
+        "rank": int(item["rank"]),
+        "strategy_name": str(item["strategy_name"]),
+        "score": _as_float(item["score"]),
+        "total_test_net_profit": _as_float(item["total_test_net_profit"]),
+        "pass_rate": _as_float(item["pass_rate"]),
+        "max_test_mdd": _as_float(item["max_test_mdd"]),
+        "average_test_pf": _as_float(item["average_test_pf"]),
+    }
+
+
+def _as_float(value: object) -> float:
+    if isinstance(value, str) and value in {"Infinity", "-Infinity", "NaN"}:
+        return 5.0 if value == "Infinity" else 0.0
+
+    number = float(value)
+    if not math.isfinite(number):
+        return 5.0 if number > 0 else 0.0
+    return number

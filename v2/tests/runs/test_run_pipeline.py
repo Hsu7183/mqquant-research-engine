@@ -11,6 +11,7 @@ from mqre_v2.runs.run_manager import (
     write_manifest,
 )
 from mqre_v2.runs.run_pipeline import run_pipeline_from_run
+from mqre_v2.reporting.wfo_report import validate_report_schema
 
 
 def _create_run(tmp_path) -> str:
@@ -82,10 +83,11 @@ def test_run_pipeline_from_run_writes_json_report(tmp_path) -> None:
 
     assert Path(result.output_json_path) == Path(run_path) / "reports" / "custom_ranking.json"
     assert payload["run_id"] == Path(run_path).name
-    assert payload["total_strategies"] == 1
-    assert payload["valid_txt"] == 1
-    assert len(payload["ranking"]) == 1
+    assert payload["summary"]["total_strategies"] == 1
+    assert payload["summary"]["valid_strategies"] == 1
+    assert len(payload["all_results"]) == 1
     assert "generated_at" in payload
+    assert validate_report_schema(payload) is True
 
 
 def test_run_pipeline_from_run_updates_manifest(tmp_path) -> None:
