@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from mqre_v2.automation.auto_research import AutoResearchConfig, run_auto_research
 from mqre_v2.forward.forward_log import (
     ForwardTestRecord,
     append_forward_record,
@@ -205,6 +206,23 @@ def manage_forward_status_from_config(config: dict) -> list[dict]:
     return [record.__dict__ for record in read_forward_records(forward_log_path)]
 
 
+def run_auto_research_from_config(config: dict) -> dict:
+    return run_auto_research(
+        AutoResearchConfig(
+            txt_folder=str(config["txt_folder"]),
+            start_date=_coerce_date(config["start_date"]),
+            end_date=_coerce_date(config["end_date"]),
+            output_json_path=str(config["output_json_path"]),
+            forward_log_path=str(config["forward_log_path"]),
+            top_n=_get_int(config, "top_n", 10),
+            auto_add_top1_to_forward=bool(
+                config.get("auto_add_top1_to_forward", True)
+            ),
+            min_score_to_forward=_get_float(config, "min_score_to_forward", 0.0),
+        )
+    )
+
+
 def run_batch_txt_ranking_from_config(config: dict) -> list[dict]:
     folder = Path(str(config["txt_folder_path"]))
     if not folder.is_dir():
@@ -308,10 +326,18 @@ def main() -> None:
     optimizer_mode = "⭐ Optimizer（新增）"
     batch_mode = "批量 TXT 排名"
     forward_mode = "Forward Test 管理"
+    auto_research_mode = "Auto Research Pipeline"
     with st.sidebar:
         mode = st.selectbox(
             "mode",
-            [single_mode, comparison_mode, optimizer_mode, batch_mode, forward_mode],
+            [
+                single_mode,
+                comparison_mode,
+                optimizer_mode,
+                batch_mode,
+                forward_mode,
+                auto_research_mode,
+            ],
         )
 
     if mode == single_mode:
@@ -322,8 +348,10 @@ def main() -> None:
         _render_optimizer_mode(st)
     elif mode == batch_mode:
         _render_batch_ranking_mode(st)
-    else:
+    elif mode == forward_mode:
         _render_forward_management_mode(st)
+    else:
+        _render_auto_research_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -545,6 +573,53 @@ def _render_forward_management_mode(st: Any) -> None:
     _render_forward_records_table(st, forward_log_path, records)
 
 
+def _render_auto_research_mode(st: Any) -> None:
+    with st.sidebar:
+        txt_folder = st.text_input("txt_folder")
+        start_date = st.date_input("start_date", value=date(2020, 1, 1))
+        end_date = st.date_input("end_date", value=date.today())
+        output_json_path = st.text_input(
+            "output_json_path",
+            value="outputs/auto_research_ranking.json",
+        )
+        forward_log_path = st.text_input(
+            "forward_log_path",
+            value="reports/forward_test_log.csv",
+        )
+        top_n = st.number_input("top_n", min_value=1, value=10, step=1)
+        min_score_to_forward = st.number_input(
+            "min_score_to_forward",
+            value=0.0,
+        )
+        auto_add_top1_to_forward = st.checkbox(
+            "auto_add_top1_to_forward",
+            value=True,
+        )
+        run_clicked = st.button("執行 Auto Research")
+
+    if not run_clicked:
+        return
+
+    try:
+        summary = run_auto_research_from_config(
+            {
+                "txt_folder": txt_folder,
+                "start_date": start_date,
+                "end_date": end_date,
+                "output_json_path": output_json_path,
+                "forward_log_path": forward_log_path,
+                "top_n": top_n,
+                "min_score_to_forward": min_score_to_forward,
+                "auto_add_top1_to_forward": auto_add_top1_to_forward,
+            }
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_auto_research_result(st, summary)
+
+
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
     return {
         "start_date": st.date_input("start_date", value=date(2020, 1, 1)),
@@ -754,6 +829,25 @@ def _render_txt_wfo_pipeline_result(
         mime="application/json",
     )
     _render_forward_test_controls(st, results, forward_log_path)
+
+
+def _render_auto_research_result(st: Any, summary: dict) -> None:
+    st.subheader("Auto Research Summary")
+    st.write(
+        {
+            "total_strategies": summary["total_strategies"],
+            "added_to_forward": summary["added_to_forward"],
+            "output_json_path": summary["output_json_path"],
+            "forward_log_path": summary["forward_log_path"],
+            "notes": summary["notes"],
+        }
+    )
+
+    st.subheader("Top 1")
+    st.write(summary["top1"])
+
+    st.subheader("Top N")
+    st.dataframe(pd.DataFrame(summary["top_n"]), use_container_width=True)
 
 
 def _render_forward_test_controls(

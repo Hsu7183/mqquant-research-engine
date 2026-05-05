@@ -71,13 +71,25 @@ Step5：Forward Test（baseline vs challenger）
 
 ## GUI Launch And Current Status
 
-GUI 已有 5 個模式：
+GUI 已有 6 個模式：
 
 1. 單一策略 WFO
 2. Baseline vs Challenger
 3. Optimizer
 4. 批量 TXT 排名
 5. Forward Test 管理
+6. Auto Research Pipeline
+
+Auto Research Pipeline 會執行：
+
+TXT 資料夾 -> WFO Pipeline -> 排名 JSON -> Top 策略加入 Forward Test candidate
+
+注意：
+
+- 這是全自動研究，不是全自動交易
+- 目前仍不接券商
+- 目前仍不接 XQ API
+- 目前仍不會自動下單
 
 啟動方式：
 
