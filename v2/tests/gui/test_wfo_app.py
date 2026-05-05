@@ -8,6 +8,7 @@ from mqre_v2.gui.wfo_app import (
     build_batch_ranking_dataframe,
     build_optimizer_dataframe,
     build_round_dataframe,
+    generate_xs_batch_from_config,
     load_parameter_grid_preview,
     run_batch_txt_ranking_from_config,
     run_baseline_challenger_from_config,
@@ -45,6 +46,36 @@ strategy_name: demo-grid
 parameters:
   A: [1, 2]
   B: [10, 20, 30]
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_xs_template(path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "EntryBufferPts={{EntryBufferPts}}",
+                "DonBufferPts={{DonBufferPts}}",
+                "ATRStopK={{ATRStopK}}",
+                "ATRTakeProfitK={{ATRTakeProfitK}}",
+                "TimeStopBars={{TimeStopBars}}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_xs_parameter_grid(path) -> None:
+    path.write_text(
+        """
+strategy_name: gui-xs
+parameters:
+  EntryBufferPts: [0, 1]
+  DonBufferPts: [2]
+  ATRStopK: [1.0, 1.5]
+  ATRTakeProfitK: [2.0]
+  TimeStopBars: [20]
 """,
         encoding="utf-8",
     )
@@ -373,3 +404,23 @@ def test_load_parameter_grid_preview(tmp_path) -> None:
         {"name": "A", "candidate_count": 2},
         {"name": "B", "candidate_count": 3},
     ]
+
+
+def test_generate_xs_batch_from_config(tmp_path) -> None:
+    template_path = tmp_path / "template.xs"
+    grid_path = tmp_path / "parameter_grid.yaml"
+    output_dir = tmp_path / "xs_batch"
+    _write_xs_template(template_path)
+    _write_xs_parameter_grid(grid_path)
+
+    result = generate_xs_batch_from_config(
+        {
+            "template_path": str(template_path),
+            "parameter_grid_path": str(grid_path),
+            "output_dir": str(output_dir),
+        }
+    )
+
+    assert result["generated_count"] == 4
+    assert len(result["paths"]) == 4
+    assert result["filenames"][0] == "gui-xs_EB0_DB2_ATRS1_ATRTP2_TS20_IDX1.xs"

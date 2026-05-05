@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from mqre_v2.optimizer.parameter_grid import expand_parameter_grid, load_parameter_grid
+from mqre_v2.optimizer.xs_batch import generate_xs_batch
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.validation.decision import compare_baseline_challenger, score_wfo_summary
 from mqre_v2.validation.wfo import (
@@ -166,6 +167,20 @@ def load_parameter_grid_preview(path: str) -> dict:
             for name, values in grid.parameters.items()
         ],
         "total_combinations": len(combinations),
+    }
+
+
+def generate_xs_batch_from_config(config: dict) -> dict:
+    paths = generate_xs_batch(
+        template_path=str(config["template_path"]),
+        parameter_grid_path=str(config["parameter_grid_path"]),
+        output_dir=str(config["output_dir"]),
+    )
+    return {
+        "generated_at": _generated_at(),
+        "generated_count": len(paths),
+        "paths": paths,
+        "filenames": [Path(path).name for path in paths],
     }
 
 
@@ -353,6 +368,13 @@ def _render_optimizer_mode(st: Any) -> None:
             "parameter_grid_path",
             value="configs/parameter_grid_0313.yaml",
         )
+        st.subheader("XS 批次產生")
+        template_path = st.text_input(
+            "template_path",
+            value="templates/xs/0313plus_template.xs",
+        )
+        output_dir = st.text_input("output_dir", value="outputs/xs_batch")
+        generate_xs_clicked = st.button("產生 XS 批次")
         load_grid_clicked = st.button("載入參數空間")
         run_clicked = st.button("執行 Optimizer")
 
@@ -363,6 +385,20 @@ def _render_optimizer_mode(st: Any) -> None:
             st.error(str(exc))
         else:
             _render_parameter_grid_preview(st, preview)
+
+    if generate_xs_clicked:
+        try:
+            xs_batch = generate_xs_batch_from_config(
+                {
+                    "template_path": template_path,
+                    "parameter_grid_path": parameter_grid_path,
+                    "output_dir": output_dir,
+                }
+            )
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_xs_batch_result(st, xs_batch)
 
     if not run_clicked:
         return
@@ -533,6 +569,15 @@ def _render_parameter_grid_preview(st: Any, preview: dict) -> None:
         }
     )
     st.dataframe(pd.DataFrame(preview["parameters"]), use_container_width=True)
+
+
+def _render_xs_batch_result(st: Any, result: dict) -> None:
+    st.subheader("XS 批次產生結果")
+    st.write({"generated_count": result["generated_count"]})
+    st.dataframe(
+        pd.DataFrame({"filename": result["filenames"][:5]}),
+        use_container_width=True,
+    )
 
 
 def _render_batch_ranking_result(st: Any, results: list[dict]) -> None:
