@@ -30,10 +30,16 @@ const fallbackReport = {
   all_results: [],
 };
 
+let currentView = "ranking";
+let currentReport = null;
+let currentSource = { dataSource: "", sourceUrl: "" };
 let scoreChart = null;
 let profitChart = null;
+let detailChart = null;
+let devtoolsTriggered = false;
 
 document.addEventListener("DOMContentLoaded", () => {
+  installFrontendFriction();
   bindAccessGate();
   if (isAuthenticated()) {
     showDashboard();
@@ -42,16 +48,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-function bindAccessGate() {
-  const passwordInput = document.getElementById("password-input");
-  const enterButton = document.getElementById("enter-button");
-  const clearButton = document.getElementById("clear-button");
-  const logoutButton = document.getElementById("logout-button");
+function installFrontendFriction() {
+  document.addEventListener("contextmenu", blockEvent, { capture: true });
+  document.addEventListener("selectstart", blockEvent, { capture: true });
+  document.addEventListener("dragstart", blockEvent, { capture: true });
+  document.addEventListener("copy", blockEvent, { capture: true });
+  document.addEventListener("cut", blockEvent, { capture: true });
 
-  enterButton.addEventListener("click", handleLogin);
-  clearButton.addEventListener("click", clearAccess);
-  logoutButton.addEventListener("click", clearAccess);
-  passwordInput.addEventListener("keydown", (event) => {
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      const key = (event.key || "").toUpperCase();
+      const blocked =
+        event.key === "F12" ||
+        (event.ctrlKey && ["U", "S", "P"].includes(key)) ||
+        (event.ctrlKey && event.shiftKey && ["I", "J"].includes(key));
+
+      if (blocked) {
+        event.preventDefault();
+        resetAuthToGate();
+      }
+    },
+    { capture: true },
+  );
+
+  window.addEventListener("resize", detectDevtools);
+  setInterval(detectDevtools, 1500);
+}
+
+function blockEvent(event) {
+  event.preventDefault();
+}
+
+function detectDevtools() {
+  if (!isAuthenticated() || devtoolsTriggered) {
+    return;
+  }
+
+  const widthGap = Math.abs(window.outerWidth - window.innerWidth);
+  const heightGap = Math.abs(window.outerHeight - window.innerHeight);
+  if (widthGap > 240 || heightGap > 240) {
+    devtoolsTriggered = true;
+    resetAuthToGate();
+    setTimeout(() => {
+      devtoolsTriggered = false;
+    }, 1200);
+  }
+}
+
+function bindAccessGate() {
+  document.getElementById("enter-button").addEventListener("click", handleLogin);
+  document.getElementById("logout-button").addEventListener("click", resetAuthToGate);
+  document.getElementById("back-button").addEventListener("click", () => showView("ranking"));
+  document.getElementById("password-input").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       handleLogin();
     }
@@ -79,35 +128,56 @@ function handleLogin() {
   passwordInput.select();
 }
 
-function clearAccess() {
+function resetAuthToGate() {
   localStorage.removeItem(DASHBOARD_AUTH_KEY);
-  document.getElementById("password-input").value = "";
-  document.getElementById("login-error").textContent = "";
   showAccessGate();
 }
 
 function showAccessGate() {
+  currentView = "ranking";
+  document.title = "入口";
   document.getElementById("access-gate").classList.remove("hidden");
-  document.getElementById("dashboard-shell").classList.add("hidden");
-  document.getElementById("password-input").focus();
+  document.getElementById("app-shell").classList.add("hidden");
+  document.getElementById("password-input").value = "";
+  document.getElementById("login-error").textContent = "";
+  setTimeout(() => document.getElementById("password-input").focus(), 0);
 }
 
 function showDashboard() {
+  document.title = "三劍客量化科技｜策略排行榜";
   document.getElementById("access-gate").classList.add("hidden");
-  document.getElementById("dashboard-shell").classList.remove("hidden");
-  loadAndRenderDashboard();
+  document.getElementById("app-shell").classList.remove("hidden");
+  showView("ranking");
+  if (currentReport) {
+    renderDashboard(currentReport, currentSource.dataSource, currentSource.sourceUrl);
+  } else {
+    loadAndRenderDashboard();
+  }
+}
+
+function showView(view) {
+  currentView = view;
+  document.getElementById("ranking-view").classList.toggle("hidden", view !== "ranking");
+  document.getElementById("detail-view").classList.toggle("hidden", view !== "detail");
 }
 
 function loadAndRenderDashboard() {
   loadLatestReport()
     .then(({ report, dataSource, sourceUrl }) => {
       validateReportSchema(report);
+      currentReport = report;
+      currentSource = { dataSource, sourceUrl };
       renderDashboard(report, dataSource, sourceUrl);
     })
     .catch((error) => {
       console.warn(error);
+      currentReport = fallbackReport;
+      currentSource = {
+        dataSource: "內建備援",
+        sourceUrl: "inline fallbackReport",
+      };
       renderStatus("GitHub 與本地 ranking JSON 皆載入失敗，改用內建備援資料。", true);
-      renderDashboard(fallbackReport, "內建備援", "inline fallbackReport");
+      renderDashboard(fallbackReport, currentSource.dataSource, currentSource.sourceUrl);
     });
 }
 
@@ -163,6 +233,9 @@ function validateReportSchema(report) {
   }
 
   for (const item of report.top_10) {
+    validateRankingItem(item);
+  }
+  for (const item of report.all_results) {
     validateRankingItem(item);
   }
 }
@@ -226,6 +299,15 @@ function renderTable(rows) {
       td.textContent = cell;
       tr.appendChild(td);
     }
+
+    const detailCell = document.createElement("td");
+    const detailButton = document.createElement("button");
+    detailButton.type = "button";
+    detailButton.className = "btn link";
+    detailButton.textContent = "查看詳情";
+    detailButton.addEventListener("click", () => renderStrategyDetail(item.strategy_name));
+    detailCell.appendChild(detailButton);
+    tr.appendChild(detailCell);
     body.appendChild(tr);
   }
 }
@@ -255,13 +337,177 @@ function renderCharts(rows) {
   );
 }
 
+function renderStrategyDetail(strategyName) {
+  if (!currentReport) {
+    return;
+  }
+
+  const row = findStrategyRow(strategyName);
+  if (!row) {
+    renderStatus(`找不到策略：${strategyName}`, true);
+    return;
+  }
+
+  showView("detail");
+  document.getElementById("detail-strategy-name").textContent = row.strategy_name;
+  document.getElementById("detail-score").textContent = formatNumber(row.score);
+  document.getElementById("detail-profit").textContent = formatMoney(row.total_test_net_profit);
+  document.getElementById("detail-pass-rate").textContent = formatPercent(row.pass_rate);
+  document.getElementById("detail-mdd").textContent = formatMoney(row.max_test_mdd);
+  document.getElementById("detail-pf").textContent = formatNumber(row.average_test_pf);
+  document.getElementById("detail-run-id").textContent = currentReport.run_id;
+  document.getElementById("detail-generated-at").textContent = formatDateTime(
+    currentReport.generated_at,
+  );
+  document.getElementById("detail-rank").textContent = `#${row.rank}`;
+
+  renderDetailKpis(row);
+  renderDetailChart(row);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function findStrategyRow(strategyName) {
+  const allResults = Array.isArray(currentReport.all_results) ? currentReport.all_results : [];
+  return (
+    allResults.find((item) => item.strategy_name === strategyName) ||
+    currentReport.top_10.find((item) => item.strategy_name === strategyName)
+  );
+}
+
+function renderDetailKpis(row) {
+  const items = [
+    {
+      label: "Score 分數",
+      value: formatNumber(row.score),
+      rating: rateScore(row.score),
+      description: "綜合策略評分，越高代表目前 ranking 表現越強。",
+    },
+    {
+      label: "Total Profit 總獲利",
+      value: formatMoney(row.total_test_net_profit),
+      rating: row.total_test_net_profit > 0 ? "Strong" : "Weak",
+      description: "WFO / Pipeline 測試區間加總淨利。",
+    },
+    {
+      label: "Pass Rate 通過率",
+      value: formatPercent(row.pass_rate),
+      rating: ratePassRate(row.pass_rate),
+      description: "WFO rounds 通過比例。",
+    },
+    {
+      label: "Max Drawdown 最大回撤",
+      value: formatMoney(row.max_test_mdd),
+      rating: rateMdd(row.max_test_mdd),
+      description: "測試期間最大回撤，越低越好。",
+    },
+    {
+      label: "Profit Factor",
+      value: formatNumber(row.average_test_pf),
+      rating: ratePf(row.average_test_pf),
+      description: "平均 test PF，衡量獲利與虧損比例。",
+    },
+    {
+      label: "Rank 排名",
+      value: `#${row.rank}`,
+      rating: row.rank <= 3 ? "Strong" : row.rank <= 10 ? "Watch" : "Weak",
+      description: "目前 ranking report 中的名次。",
+    },
+  ];
+
+  const body = document.getElementById("detail-kpi-body");
+  body.replaceChildren();
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    appendTextCell(tr, item.label);
+    appendTextCell(tr, item.value);
+    const ratingCell = appendTextCell(tr, item.rating);
+    ratingCell.className = `rating-${item.rating.toLowerCase()}`;
+    appendTextCell(tr, item.description);
+    body.appendChild(tr);
+  }
+}
+
+function appendTextCell(row, value) {
+  const cell = document.createElement("td");
+  cell.textContent = value;
+  row.appendChild(cell);
+  return cell;
+}
+
+function renderDetailChart(row) {
+  if (!window.Chart) {
+    return;
+  }
+
+  const top10 = currentReport.top_10.slice(0, 10);
+  const labels = top10.map((item) => `#${item.rank}`);
+  const scoreColors = top10.map((item) =>
+    item.strategy_name === row.strategy_name ? "#d32f2f" : "#93c5fd",
+  );
+  const profitColors = top10.map((item) =>
+    item.strategy_name === row.strategy_name ? "#10b981" : "#bbf7d0",
+  );
+
+  if (detailChart) {
+    detailChart.destroy();
+  }
+
+  detailChart = new Chart(document.getElementById("detail-chart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "分數",
+          data: top10.map((item) => item.score),
+          backgroundColor: scoreColors,
+          borderRadius: 6,
+          maxBarThickness: 34,
+          yAxisID: "score",
+        },
+        {
+          label: "總獲利",
+          data: top10.map((item) => item.total_test_net_profit),
+          backgroundColor: profitColors,
+          borderRadius: 6,
+          maxBarThickness: 34,
+          yAxisID: "profit",
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      responsive: true,
+      plugins: {
+        legend: { position: "bottom" },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+        },
+        score: {
+          beginAtZero: true,
+          position: "left",
+          title: { display: true, text: "分數" },
+          grid: { color: "#eef2f7" },
+        },
+        profit: {
+          beginAtZero: true,
+          position: "right",
+          title: { display: true, text: "總獲利" },
+          grid: { drawOnChartArea: false },
+        },
+      },
+    },
+  });
+}
+
 function renderBarChart(canvasId, labels, values, label, color, existingChart) {
   if (existingChart) {
     existingChart.destroy();
   }
 
-  const canvas = document.getElementById(canvasId);
-  return new Chart(canvas, {
+  return new Chart(document.getElementById(canvasId), {
     type: "bar",
     data: {
       labels,
@@ -301,6 +547,30 @@ function renderBarChart(canvasId, labels, values, label, color, existingChart) {
       },
     },
   });
+}
+
+function rateScore(value) {
+  if (value >= 100) return "Strong";
+  if (value >= 80) return "Watch";
+  return "Weak";
+}
+
+function ratePassRate(value) {
+  if (value >= 0.6) return "Strong";
+  if (value >= 0.4) return "Watch";
+  return "Weak";
+}
+
+function ratePf(value) {
+  if (value >= 1.5) return "Strong";
+  if (value >= 1.1) return "Watch";
+  return "Weak";
+}
+
+function rateMdd(value) {
+  if (value <= 10000) return "Strong";
+  if (value <= 20000) return "Watch";
+  return "Weak";
 }
 
 function shortName(value) {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>三劍客量化科技｜mqquant 策略排行榜</title>
+    <title>入口</title>
     <style>
       :root {
         color-scheme: light;
@@ -12,12 +12,16 @@
         --text: #1f2937;
         --muted: #6b7280;
         --line: #e5e7eb;
-        --soft-line: #eef2f7;
+        --soft: #f9fafb;
         --primary: #2563eb;
         --primary-dark: #1e40af;
         --danger: #b42318;
-        --shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
-        --radius: 16px;
+        --strong: #d32f2f;
+        --watch: #c97706;
+        --weak: #6b7280;
+        --profit: #10b981;
+        --shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        --radius: 14px;
       }
 
       * {
@@ -28,6 +32,7 @@
       body {
         margin: 0;
         min-height: 100%;
+        user-select: none;
       }
 
       body {
@@ -49,93 +54,58 @@
         font: inherit;
       }
 
+      img,
+      a {
+        -webkit-user-drag: none;
+      }
+
       .hidden {
         display: none !important;
       }
 
-      .access-page {
+      .gate-page {
         align-items: center;
         display: flex;
         justify-content: center;
         min-height: 100vh;
-        padding: 28px 18px;
+        padding: 24px;
       }
 
-      .access-card {
+      .gate-card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--radius);
         box-shadow: var(--shadow);
-        max-width: 440px;
-        padding: 30px;
+        max-width: 360px;
+        padding: 26px;
+        width: 100%;
+      }
+
+      .gate-card input {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        display: block;
+        outline: none;
+        padding: 13px 14px;
         text-align: center;
         width: 100%;
       }
 
-      .access-badge,
-      .banner {
-        color: var(--primary);
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .access-card h1 {
-        font-size: 25px;
-        margin: 12px 0 8px;
-      }
-
-      .access-note,
-      .subtitle,
-      .status,
-      .meta {
-        color: var(--muted);
-      }
-
-      .access-note {
-        font-size: 13px;
-        margin: 0 0 22px;
-      }
-
-      .password-row {
-        display: grid;
-        gap: 12px;
-      }
-
-      .password-row input {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        outline: none;
-        padding: 13px 14px;
-        text-align: center;
-        transition:
-          border-color 0.16s ease,
-          box-shadow 0.16s ease;
-      }
-
-      .password-row input:focus {
+      .gate-card input:focus {
         border-color: var(--primary);
         box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-      }
-
-      .button-row {
-        display: grid;
-        gap: 10px;
-        grid-template-columns: 1fr 1fr;
-        margin-top: 12px;
       }
 
       .btn {
         align-items: center;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 10px;
         cursor: pointer;
         display: inline-flex;
         font-weight: 700;
         justify-content: center;
-        min-height: 42px;
-        padding: 9px 14px;
+        min-height: 40px;
+        padding: 8px 13px;
         transition:
           background 0.16s ease,
           border-color 0.16s ease,
@@ -161,27 +131,37 @@
         color: #374151;
       }
 
+      .btn.link {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: var(--primary);
+        min-height: 34px;
+        padding: 6px 11px;
+      }
+
+      .gate-card .btn {
+        margin-top: 12px;
+        width: 100%;
+      }
+
       .error-message {
         color: var(--danger);
+        font-size: 13px;
         font-weight: 700;
         min-height: 22px;
         margin: 12px 0 0;
+        text-align: center;
       }
 
-      .security-note {
-        color: var(--muted);
-        font-size: 12px;
-        margin: 18px 0 0;
-      }
-
-      .dashboard-shell {
+      .app-shell {
         margin: 0 auto;
         max-width: 1180px;
-        padding: 22px 18px 40px;
+        padding: 20px 16px 40px;
       }
 
+      .panel,
       .hero-card,
-      .panel {
+      .kpi-card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: var(--radius);
@@ -189,37 +169,49 @@
       }
 
       .hero-card {
-        padding: 22px;
+        padding: 20px;
       }
 
       .hero-top {
         align-items: flex-start;
         display: flex;
-        gap: 16px;
+        gap: 14px;
         justify-content: space-between;
       }
 
       h1 {
         font-size: 28px;
-        letter-spacing: 0;
         line-height: 1.25;
-        margin: 8px 0;
+        margin: 0 0 8px;
+      }
+
+      h2 {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+
+      .subtitle,
+      .status,
+      .muted {
+        color: var(--muted);
       }
 
       .subtitle {
         margin: 0;
       }
 
-      .meta-grid {
+      .meta-grid,
+      .summary-grid {
         display: grid;
         gap: 12px;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         margin-top: 18px;
       }
 
-      .meta-card {
-        background: #f9fafb;
-        border: 1px solid var(--soft-line);
+      .meta-card,
+      .summary-card {
+        background: var(--soft);
+        border: 1px solid #eef2f7;
         border-radius: 12px;
         padding: 12px;
       }
@@ -232,7 +224,6 @@
       }
 
       .meta-value {
-        color: var(--text);
         font-weight: 800;
         overflow-wrap: anywhere;
       }
@@ -245,11 +236,6 @@
 
       .panel {
         padding: 18px;
-      }
-
-      h2 {
-        font-size: 18px;
-        margin: 0 0 12px;
       }
 
       .status {
@@ -274,19 +260,24 @@
       th,
       td {
         border-bottom: 1px solid var(--line);
-        padding: 11px 10px;
+        padding: 10px 9px;
         text-align: right;
         white-space: nowrap;
       }
 
       th {
+        background: #fafafa;
         color: var(--muted);
         font-size: 12px;
         font-weight: 800;
       }
 
       th:nth-child(2),
-      td:nth-child(2) {
+      td:nth-child(2),
+      .kpi-table td:first-child,
+      .kpi-table th:first-child,
+      .kpi-table td:nth-child(4),
+      .kpi-table th:nth-child(4) {
         text-align: left;
       }
 
@@ -313,17 +304,71 @@
         position: relative;
       }
 
+      .detail-chart-card {
+        height: 340px;
+      }
+
+      .detail-chart-card .chart-box {
+        height: 272px;
+      }
+
       .chart-box canvas {
         height: 100% !important;
         width: 100% !important;
       }
 
-      @media (max-width: 880px) {
-        .hero-top {
+      .summary-card {
+        min-height: 76px;
+      }
+
+      .summary-card .meta-value {
+        font-size: 17px;
+      }
+
+      .detail-header {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      .detail-title {
+        overflow-wrap: anywhere;
+      }
+
+      .kpi-table .rating-strong {
+        color: var(--strong);
+        font-weight: 800;
+      }
+
+      .kpi-table .rating-watch {
+        color: var(--watch);
+        font-weight: 800;
+      }
+
+      .kpi-table .rating-weak {
+        color: var(--weak);
+        font-weight: 800;
+      }
+
+      .note-list {
+        color: var(--muted);
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .note-list li {
+        margin: 6px 0;
+      }
+
+      @media (max-width: 900px) {
+        .hero-top,
+        .detail-header {
           display: grid;
         }
 
-        .meta-grid {
+        .meta-grid,
+        .summary-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -333,13 +378,12 @@
       }
 
       @media (max-width: 560px) {
-        .access-card,
-        .hero-card,
-        .panel {
-          border-radius: 12px;
+        .app-shell {
+          padding-inline: 12px;
         }
 
-        .meta-grid {
+        .meta-grid,
+        .summary-grid {
           grid-template-columns: 1fr;
         }
 
@@ -347,8 +391,10 @@
           font-size: 23px;
         }
 
-        .button-row {
-          grid-template-columns: 1fr;
+        .gate-card,
+        .panel,
+        .hero-card {
+          border-radius: 12px;
         }
       }
     </style>
@@ -356,37 +402,27 @@
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <section id="access-gate" class="access-page">
-      <div class="access-card">
-        <div class="access-badge">Restricted Strategy Research System</div>
-        <h1>三劍客量化科技</h1>
-        <p class="access-note">請輸入授權密碼以進入 mqquant 策略排行榜。</p>
-        <div class="password-row">
-          <input
-            id="password-input"
-            type="password"
-            autocomplete="current-password"
-            placeholder="密碼 / Password"
-          />
-          <div class="button-row">
-            <button id="enter-button" class="btn primary" type="button">進入 / Enter</button>
-            <button id="clear-button" class="btn secondary" type="button">清除 / Clear</button>
-          </div>
-        </div>
+    <section id="access-gate" class="gate-page">
+      <div class="gate-card">
+        <input
+          id="password-input"
+          type="password"
+          autocomplete="current-password"
+          placeholder="密碼"
+        />
+        <button id="enter-button" class="btn primary" type="button">確定</button>
         <p id="login-error" class="error-message" aria-live="polite"></p>
-        <p class="security-note">前端密碼僅為基本阻擋，非正式資安保護。</p>
       </div>
     </section>
 
-    <div id="dashboard-shell" class="dashboard-shell hidden">
+    <div id="app-shell" class="app-shell hidden">
       <header class="hero-card">
         <div class="hero-top">
           <div>
-            <div class="banner">RESTRICTED STRATEGY RESEARCH SYSTEM</div>
-            <h1>三劍客量化科技｜mqquant 策略排行榜</h1>
+            <h1>三劍客量化科技｜策略排行榜</h1>
             <p class="subtitle">本頁僅供策略研究與風險控管使用，不代表實盤交易建議。</p>
           </div>
-          <button id="logout-button" class="btn secondary" type="button">清除登入</button>
+          <button id="logout-button" class="btn secondary" type="button">登出</button>
         </div>
         <div class="meta-grid">
           <div class="meta-card">
@@ -408,7 +444,7 @@
         </div>
       </header>
 
-      <main>
+      <main id="ranking-view">
         <section class="panel">
           <h2>Top10 策略排行榜</h2>
           <p id="status" class="status">正在載入 GitHub ranking JSON...</p>
@@ -423,6 +459,7 @@
                   <th>通過率</th>
                   <th>最大回撤</th>
                   <th>PF</th>
+                  <th>查看</th>
                 </tr>
               </thead>
               <tbody id="ranking-body"></tbody>
@@ -443,6 +480,86 @@
               <canvas id="profit-chart"></canvas>
             </div>
           </div>
+        </section>
+      </main>
+
+      <main id="detail-view" class="hidden">
+        <section class="hero-card">
+          <div class="detail-header">
+            <div>
+              <p class="status">單一策略詳情</p>
+              <h1 id="detail-strategy-name" class="detail-title">策略名稱</h1>
+            </div>
+            <button id="back-button" class="btn secondary" type="button">返回排行榜</button>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <div class="meta-label">分數</div>
+              <div id="detail-score" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">總獲利</div>
+              <div id="detail-profit" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">通過率</div>
+              <div id="detail-pass-rate" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">最大回撤</div>
+              <div id="detail-mdd" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">PF</div>
+              <div id="detail-pf" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">Run ID</div>
+              <div id="detail-run-id" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">更新時間</div>
+              <div id="detail-generated-at" class="meta-value">-</div>
+            </div>
+            <div class="summary-card">
+              <div class="meta-label">排名</div>
+              <div id="detail-rank" class="meta-value">-</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel detail-chart-card">
+          <h2>策略分數 / 淨利柱狀圖</h2>
+          <div class="chart-box">
+            <canvas id="detail-chart"></canvas>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>KPI 表</h2>
+          <div class="table-wrap">
+            <table class="kpi-table">
+              <thead>
+                <tr>
+                  <th>指標</th>
+                  <th>數值</th>
+                  <th>評估</th>
+                  <th>說明</th>
+                </tr>
+              </thead>
+              <tbody id="detail-kpi-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>策略說明</h2>
+          <ul class="note-list">
+            <li>這是 WFO / Pipeline 結果。</li>
+            <li>目前詳情頁使用 ranking report 資料，不包含完整逐筆交易明細。</li>
+            <li>這不是實盤績效，也不代表未來保證。</li>
+            <li>策略仍需經過 Forward Test 與人工審核。</li>
+          </ul>
         </section>
       </main>
     </div>
