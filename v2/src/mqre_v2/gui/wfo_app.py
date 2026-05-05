@@ -10,6 +10,11 @@ from typing import Any
 
 import pandas as pd
 
+from mqre_v2.forward.forward_log import (
+    ForwardTestRecord,
+    append_forward_record,
+    read_forward_records,
+)
 from mqre_v2.optimizer.parameter_grid import expand_parameter_grid, load_parameter_grid
 from mqre_v2.optimizer.xs_batch import generate_xs_batch
 from mqre_v2.pipeline.txt_wfo_pipeline import (
@@ -434,6 +439,10 @@ def _render_batch_ranking_mode(st: Any) -> None:
             "output_json_path",
             value="outputs/txt_wfo_pipeline.json",
         )
+        forward_log_path = st.text_input(
+            "forward_log_path",
+            value="reports/forward_test_log.csv",
+        )
         config = {
             "txt_folder_path": txt_folder_path,
             "file_pattern": file_pattern,
@@ -454,7 +463,22 @@ def _render_batch_ranking_mode(st: Any) -> None:
         except Exception as exc:
             st.error(str(exc))
         else:
-            _render_txt_wfo_pipeline_result(st, pipeline_results, output_json_path)
+            _set_session_value(st, "txt_wfo_pipeline_results", pipeline_results)
+            _set_session_value(st, "txt_wfo_pipeline_output_json_path", output_json_path)
+
+    pipeline_results = _get_session_value(st, "txt_wfo_pipeline_results")
+    pipeline_output_json_path = _get_session_value(
+        st,
+        "txt_wfo_pipeline_output_json_path",
+        output_json_path,
+    )
+    if pipeline_results is not None:
+        _render_txt_wfo_pipeline_result(
+            st,
+            pipeline_results,
+            pipeline_output_json_path,
+            forward_log_path,
+        )
 
     if not run_clicked:
         return
@@ -651,10 +675,12 @@ def _render_txt_wfo_pipeline_result(
     st: Any,
     results: list[dict],
     output_json_path: str,
+    forward_log_path: str,
 ) -> None:
     if not results:
         st.warning("No TXT files matched the pipeline input.")
         st.write({"output_json_path": output_json_path})
+        _render_forward_log_table(st, forward_log_path)
         return
 
     payload = {
@@ -673,6 +699,57 @@ def _render_txt_wfo_pipeline_result(
         data=json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
         file_name=Path(output_json_path).name,
         mime="application/json",
+    )
+    _render_forward_test_controls(st, results, forward_log_path)
+
+
+def _render_forward_test_controls(
+    st: Any,
+    results: list[dict],
+    forward_log_path: str,
+) -> None:
+    st.subheader("Forward Test")
+    top_result = results[0]
+    st.write(
+        {
+            "top1_strategy_name": top_result["strategy_name"],
+            "top1_txt_path": top_result["txt_path"],
+            "top1_score": top_result["score"],
+        }
+    )
+
+    if st.button("加入 Forward Test 觀察"):
+        record = _build_forward_record_from_pipeline_result(top_result)
+        try:
+            append_forward_record(forward_log_path, record)
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            st.success(f"Added {record.strategy_name} to forward test log.")
+
+    _render_forward_log_table(st, forward_log_path)
+
+
+def _render_forward_log_table(st: Any, forward_log_path: str) -> None:
+    records = read_forward_records(forward_log_path)
+    st.write({"forward_log_path": forward_log_path})
+    st.dataframe(
+        pd.DataFrame([record.__dict__ for record in records]),
+        use_container_width=True,
+    )
+
+
+def _build_forward_record_from_pipeline_result(result: dict) -> ForwardTestRecord:
+    timestamp = _generated_at()
+    return ForwardTestRecord(
+        strategy_name=str(result["strategy_name"]),
+        txt_path=str(result["txt_path"]),
+        status="candidate",
+        created_at=timestamp,
+        updated_at=timestamp,
+        source_score=float(result["score"]),
+        source_pass_rate=float(result["pass_rate"]),
+        source_total_test_net_profit=float(result["total_test_net_profit"]),
     )
 
 
@@ -847,6 +924,19 @@ def _empty_summary_dict() -> dict[str, float | int]:
 
 def _generated_at() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _set_session_value(st: Any, key: str, value: Any) -> None:
+    session_state = getattr(st, "session_state", None)
+    if session_state is not None:
+        session_state[key] = value
+
+
+def _get_session_value(st: Any, key: str, default: Any = None) -> Any:
+    session_state = getattr(st, "session_state", None)
+    if session_state is None:
+        return default
+    return session_state.get(key, default)
 
 
 def _coerce_date(value: Any) -> date:
