@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import json
+import math
+from dataclasses import replace
 from datetime import date, datetime, timezone
+from itertools import product
 from typing import Any
 
 import pandas as pd
 
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
-from mqre_v2.validation.decision import compare_baseline_challenger
+from mqre_v2.validation.decision import compare_baseline_challenger, score_wfo_summary
 from mqre_v2.validation.wfo import (
     TxtWfoInput,
     WfoGateConfig,
+    WfoRoundResult,
     WfoRunResult,
     build_txt_evaluate_fn,
     default_optimize_fn,
@@ -23,6 +27,18 @@ ROUND_DATAFRAME_COLUMNS = [
     "test_mdd",
     "test_pf",
     "test_trade_count",
+]
+
+OPTIMIZER_TABLE_COLUMNS = [
+    "rank",
+    "slippage",
+    "fee",
+    "min_pf",
+    "total_test_net_profit",
+    "pass_rate",
+    "max_test_mdd",
+    "average_test_pf",
+    "score",
 ]
 
 
@@ -72,6 +88,65 @@ def run_baseline_challenger_from_config(config: dict) -> dict:
     }
 
 
+def run_simple_optimizer(config: dict) -> list[dict]:
+    strategy_name = str(config.get("strategy_name", "optimizer-strategy"))
+    slippage_values = _parse_float_range(config.get("slippage_points_range", "1,2,3,4"))
+    fee_values = _parse_float_range(config.get("fee_points_range", "0,1,2"))
+    min_pf_values = _parse_float_range(config.get("min_test_pf_range", "1.0,1.1,1.2"))
+
+    results: list[dict] = []
+    for slippage, fee, min_pf in product(slippage_values, fee_values, min_pf_values):
+        run_config = dict(config)
+        run_config["slippage_points"] = slippage
+        run_config["fee_points"] = fee
+        run_config["min_test_pf"] = min_pf
+
+        wfo_result = _run_wfo_for_txt(
+            txt_path=str(config["base_txt_path"]),
+            strategy_name=strategy_name,
+            config=run_config,
+        )
+        summary = wfo_result.summary
+        payload = wfo_run_result_to_dict(wfo_result)
+
+        results.append(
+            {
+                "rank": 0,
+                "slippage": slippage,
+                "fee": fee,
+                "min_pf": min_pf,
+                "total_test_net_profit": _safe_number(summary.total_test_net_profit),
+                "pass_rate": _safe_number(summary.pass_rate),
+                "max_test_mdd": _safe_number(summary.max_test_mdd),
+                "average_test_pf": _safe_number(summary.average_test_pf),
+                "score": _safe_number(score_wfo_summary(summary)),
+                "summary": payload["summary"],
+                "round_results": payload["round_results"],
+                "passed": payload["passed"],
+                "fail_reason": payload["fail_reason"],
+            }
+        )
+
+    results.sort(key=lambda item: float(item["score"]), reverse=True)
+    for rank, result in enumerate(results, start=1):
+        result["rank"] = rank
+    return results
+
+
+def build_optimizer_dataframe(results: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(results)
+    if df.empty:
+        return pd.DataFrame(columns=OPTIMIZER_TABLE_COLUMNS)
+
+    df = df[OPTIMIZER_TABLE_COLUMNS].copy()
+    for column in OPTIMIZER_TABLE_COLUMNS:
+        df[column] = pd.to_numeric(
+            df[column].replace({"Infinity": float("inf"), "-Infinity": -float("inf")}),
+            errors="coerce",
+        )
+    return df
+
+
 def build_round_dataframe(round_results: list | tuple) -> pd.DataFrame:
     rows = [
         {column: _get_round_value(result, column) for column in ROUND_DATAFRAME_COLUMNS}
@@ -95,13 +170,18 @@ def main() -> None:
     st.set_page_config(page_title="mqquant 策略研究工作台", layout="wide")
     st.title("mqquant 策略研究工作台")
 
+    single_mode = "單一策略 WFO"
+    comparison_mode = "Baseline vs Challenger"
+    optimizer_mode = "⭐ Optimizer（新增）"
     with st.sidebar:
-        mode = st.selectbox("mode", ["單一策略 WFO", "Baseline vs Challenger"])
+        mode = st.selectbox("mode", [single_mode, comparison_mode, optimizer_mode])
 
-    if mode == "單一策略 WFO":
+    if mode == single_mode:
         _render_single_wfo_mode(st)
-    else:
+    elif mode == comparison_mode:
         _render_baseline_challenger_mode(st)
+    else:
+        _render_optimizer_mode(st)
 
 
 def _render_single_wfo_mode(st: Any) -> None:
@@ -157,6 +237,39 @@ def _render_baseline_challenger_mode(st: Any) -> None:
         return
 
     _render_baseline_challenger_result(st, payload)
+
+
+def _render_optimizer_mode(st: Any) -> None:
+    with st.sidebar:
+        base_txt_path = st.text_input("base_txt_path")
+        strategy_name = st.text_input("strategy_name", value="optimizer-strategy")
+        start_date = st.date_input("start_date", value=date(2020, 1, 1))
+        end_date = st.date_input("end_date", value=date.today())
+        slippage_points_range = st.text_input("slippage_points_range", value="1,2,3,4")
+        fee_points_range = st.text_input("fee_points_range", value="0,1,2")
+        min_test_pf_range = st.text_input("min_test_pf_range", value="1.0,1.1,1.2")
+        run_clicked = st.button("執行 Optimizer")
+
+    if not run_clicked:
+        return
+
+    try:
+        results = run_simple_optimizer(
+            {
+                "base_txt_path": base_txt_path,
+                "strategy_name": strategy_name,
+                "start_date": start_date,
+                "end_date": end_date,
+                "slippage_points_range": slippage_points_range,
+                "fee_points_range": fee_points_range,
+                "min_test_pf_range": min_test_pf_range,
+            }
+        )
+    except Exception as exc:
+        st.error(str(exc))
+        return
+
+    _render_optimizer_result(st, results)
 
 
 def _wfo_parameter_inputs(st: Any) -> dict[str, Any]:
@@ -232,6 +345,44 @@ def _render_baseline_challenger_result(st: Any, payload: dict) -> None:
         "下載比較 JSON",
         data=json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
         file_name="baseline_challenger_report.json",
+        mime="application/json",
+    )
+
+
+def _render_optimizer_result(st: Any, results: list[dict]) -> None:
+    if not results:
+        st.warning("No optimizer results.")
+        return
+
+    optimizer_payload = {
+        "generated_at": _generated_at(),
+        "results": results,
+    }
+    table = build_optimizer_dataframe(results)
+
+    st.subheader("Top 10")
+    st.dataframe(table.head(10), use_container_width=True)
+
+    top_result = results[0]
+    st.subheader("Top 1 Strategy")
+    st.write(
+        {
+            "slippage": top_result["slippage"],
+            "fee": top_result["fee"],
+            "min_pf": top_result["min_pf"],
+            "score": top_result["score"],
+            "total_test_net_profit": top_result["total_test_net_profit"],
+            "pass_rate": top_result["pass_rate"],
+        }
+    )
+
+    _render_summary(st, "Top 1 Summary", top_result["summary"])
+    _render_round_charts(st, top_result["round_results"])
+
+    st.download_button(
+        "下載 Optimizer JSON",
+        data=json.dumps(optimizer_payload, ensure_ascii=False, indent=2, allow_nan=False),
+        file_name="optimizer_report.json",
         mime="application/json",
     )
 
@@ -317,13 +468,22 @@ def _run_wfo_for_txt(txt_path: str, strategy_name: str, config: dict) -> WfoRunR
         strategy_name=strategy_name,
         txt_path=txt_path,
     )
+    evaluate_fn = build_txt_evaluate_fn(txt_input)
+    slippage_points = _get_float(config, "slippage_points", 0.0)
+    fee_points = _get_float(config, "fee_points", 0.0)
+    if slippage_points or fee_points:
+        evaluate_fn = _build_cost_adjusted_evaluate_fn(
+            evaluate_fn,
+            slippage_points=slippage_points,
+            fee_points=fee_points,
+        )
 
     return run_wfo(
         start_date=_coerce_date(config["start_date"]),
         end_date=_coerce_date(config["end_date"]),
         strategy_name=strategy_name,
         optimize_fn=default_optimize_fn,
-        evaluate_fn=build_txt_evaluate_fn(txt_input),
+        evaluate_fn=evaluate_fn,
         window_kwargs={
             "train_months": _get_int(config, "train_months", 36),
             "gap_months": _get_int(config, "gap_months", 1),
@@ -337,6 +497,26 @@ def _run_wfo_for_txt(txt_path: str, strategy_name: str, config: dict) -> WfoRunR
             min_pass_rate=_get_float(config, "min_pass_rate", 0.6),
         ),
     )
+
+
+def _build_cost_adjusted_evaluate_fn(
+    evaluate_fn: Any,
+    *,
+    slippage_points: float,
+    fee_points: float,
+) -> Any:
+    per_trade_cost = slippage_points + fee_points
+
+    def wrapped(window: Any, optimizer_result: Any) -> WfoRoundResult:
+        round_result = evaluate_fn(window, optimizer_result)
+        total_cost = per_trade_cost * round_result.test_trade_count
+        return replace(
+            round_result,
+            test_net_profit=round_result.test_net_profit - total_cost,
+            test_mdd=round_result.test_mdd + max(total_cost, 0.0),
+        )
+
+    return wrapped
 
 
 def _generated_at() -> str:
@@ -355,6 +535,27 @@ def _get_int(config: dict, key: str, default: int) -> int:
 
 def _get_float(config: dict, key: str, default: float) -> float:
     return float(config.get(key, default))
+
+
+def _parse_float_range(value: Any) -> list[float]:
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+    else:
+        parts = list(value)
+
+    if not parts:
+        raise ValueError("range cannot be empty")
+
+    return [float(part) for part in parts]
+
+
+def _safe_number(value: float | int) -> float | str:
+    number = float(value)
+    if math.isnan(number):
+        return "NaN"
+    if math.isinf(number):
+        return "Infinity" if number > 0 else "-Infinity"
+    return number
 
 
 def _get_round_value(round_result: Any, key: str) -> Any:

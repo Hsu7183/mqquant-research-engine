@@ -3,8 +3,11 @@ from datetime import date
 import pytest
 
 from mqre_v2.gui.wfo_app import (
+    OPTIMIZER_TABLE_COLUMNS,
+    build_optimizer_dataframe,
     build_round_dataframe,
     run_baseline_challenger_from_config,
+    run_simple_optimizer,
     run_txt_wfo_from_config,
 )
 
@@ -61,6 +64,25 @@ def _comparison_config(baseline_path, challenger_path) -> dict:
         "min_test_pf": 1.05,
         "min_pass_rate": 0.6,
         "min_improvement": 5.0,
+    }
+
+
+def _optimizer_config(txt_path) -> dict:
+    return {
+        "base_txt_path": str(txt_path),
+        "strategy_name": "optimizer-strategy",
+        "start_date": date(2023, 1, 1),
+        "end_date": date(2023, 3, 31),
+        "train_months": 1,
+        "gap_months": 1,
+        "test_months": 1,
+        "step_months": 1,
+        "min_test_trade_count": 1,
+        "max_test_mdd": 15000.0,
+        "min_pass_rate": 0.6,
+        "slippage_points_range": "1,2",
+        "fee_points_range": "0,1",
+        "min_test_pf_range": "1.0,1.1",
     }
 
 
@@ -212,3 +234,37 @@ def test_build_round_dataframe_columns_and_cum_pnl() -> None:
     ]
     assert df["round_id"].tolist() == [1, 2, 3]
     assert df["cum_pnl"].tolist() == pytest.approx([100.0, 60.0, 130.0])
+
+
+def test_run_simple_optimizer_generates_multiple_results(tmp_path) -> None:
+    txt_path = tmp_path / "trades.txt"
+    _write_sample_txt(txt_path)
+
+    results = run_simple_optimizer(_optimizer_config(txt_path))
+
+    assert len(results) == 8
+    assert len(results) > 0
+
+
+def test_build_optimizer_dataframe_columns(tmp_path) -> None:
+    txt_path = tmp_path / "trades.txt"
+    _write_sample_txt(txt_path)
+
+    results = run_simple_optimizer(_optimizer_config(txt_path))
+    df = build_optimizer_dataframe(results)
+
+    assert list(df.columns) == OPTIMIZER_TABLE_COLUMNS
+    assert len(df) == 8
+
+
+def test_run_simple_optimizer_sorts_by_score_desc(tmp_path) -> None:
+    txt_path = tmp_path / "trades.txt"
+    _write_sample_txt(txt_path)
+
+    results = run_simple_optimizer(_optimizer_config(txt_path))
+    scores = [result["score"] for result in results]
+
+    assert scores == sorted(scores, reverse=True)
+    assert results[0]["rank"] == 1
+    assert results[0]["slippage"] == pytest.approx(1.0)
+    assert results[0]["fee"] == pytest.approx(0.0)
