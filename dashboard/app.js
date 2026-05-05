@@ -1,4 +1,4 @@
-const DASHBOARD_PASSWORD = "mqquant";
+const DASHBOARD_PASSWORD = "1qazxcvbnm,./";
 const DASHBOARD_AUTH_KEY = "mqquant_dashboard_authenticated";
 
 const GITHUB_OWNER = "Hsu7183";

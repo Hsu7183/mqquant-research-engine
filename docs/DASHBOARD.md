@@ -27,7 +27,7 @@ https://hsu7183.github.io/mqquant-research-engine/dashboard/
 預設密碼：
 
 ```text
-mqquant
+1qazxcvbnm,./
 ```
 
 注意：GitHub Pages 的前端密碼不是正式資安，只是基本阻擋。密碼與資料仍會存在前端程式與公開 JSON 中。
