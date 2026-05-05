@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
-from mqre_v2.core.trades import TradeRecord, TradeSide
+from mqre_v2.core.trades import ExtendedTradeRecord, TradeRecord
 
 
 _COLUMN_ALIASES = {
@@ -17,9 +17,9 @@ _COLUMN_ALIASES = {
     "exittime": "exit_time",
     "exit_datetime": "exit_time",
     "exit_date_time": "exit_time",
-    "side": "side",
-    "direction": "side",
-    "position": "side",
+    "side": "direction",
+    "direction": "direction",
+    "position": "direction",
     "entry_price": "entry_price",
     "entryprice": "entry_price",
     "exit_price": "exit_price",
@@ -31,29 +31,30 @@ _COLUMN_ALIASES = {
     "slippage": "slippage_points",
     "fee_points": "fee_points",
     "fee": "fee_points",
-    "pnl_points": "pnl_points",
-    "pnl": "pnl_points",
-    "profit": "pnl_points",
-    "pnl_after_cost_points": "pnl_after_cost_points",
-    "pnl_after_cost": "pnl_after_cost_points",
-    "net_pnl": "pnl_after_cost_points",
+    "pnl_points": "pnl",
+    "pnl": "pnl",
+    "profit": "pnl",
+    "pnl_after_cost_points": "pnl_after_cost",
+    "pnl_after_cost": "pnl_after_cost",
+    "net_pnl": "pnl_after_cost",
 }
 
-_REQUIRED_COLUMNS = {
+_BASE_REQUIRED_COLUMNS = {
     "entry_time",
     "exit_time",
-    "side",
+    "direction",
     "entry_price",
     "exit_price",
+}
+
+_EXTENDED_REQUIRED_COLUMNS = {
     "qty",
     "slippage_points",
     "fee_points",
-    "pnl_points",
-    "pnl_after_cost_points",
 }
 
 
-def parse_trade_txt(text: str) -> list[TradeRecord]:
+def parse_xs_txt(text: str) -> list[TradeRecord]:
     rows = list(_parse_rows(text))
     if not rows:
         raise ValueError("trade txt cannot be empty")
@@ -65,8 +66,35 @@ def parse_trade_txt(text: str) -> list[TradeRecord]:
     return records
 
 
+def parse_xs_txt_extended(text: str) -> list[ExtendedTradeRecord]:
+    rows = list(_parse_rows(text))
+    if not rows:
+        raise ValueError("trade txt cannot be empty")
+
+    records = [_row_to_extended_trade_record(row) for row in rows]
+    if not records:
+        raise ValueError("trade txt contains no trade records")
+
+    return records
+
+
+def parse_xs_txt_file(path: str | Path, encoding: str = "utf-8-sig") -> list[TradeRecord]:
+    return parse_xs_txt(Path(path).read_text(encoding=encoding))
+
+
+def parse_xs_txt_extended_file(
+    path: str | Path,
+    encoding: str = "utf-8-sig",
+) -> list[ExtendedTradeRecord]:
+    return parse_xs_txt_extended(Path(path).read_text(encoding=encoding))
+
+
+def parse_trade_txt(text: str) -> list[TradeRecord]:
+    return parse_xs_txt(text)
+
+
 def parse_trade_txt_file(path: str | Path, encoding: str = "utf-8-sig") -> list[TradeRecord]:
-    return parse_trade_txt(Path(path).read_text(encoding=encoding))
+    return parse_xs_txt_file(path, encoding=encoding)
 
 
 def _parse_rows(text: str) -> Iterable[dict[str, str]]:
@@ -100,31 +128,54 @@ def _parse_whitespace_rows(lines: list[str]) -> list[dict[str, str]]:
 
 
 def _row_to_trade_record(row: dict[str, str]) -> TradeRecord:
-    normalized = {_normalize_column(key): value.strip() for key, value in row.items() if key}
-    missing = _REQUIRED_COLUMNS - set(normalized)
-    if missing:
-        raise ValueError(f"missing required trade columns: {sorted(missing)}")
+    normalized = _normalize_row(row)
+    _validate_columns(normalized, _BASE_REQUIRED_COLUMNS)
+
+    entry_price = _parse_float(normalized["entry_price"], "entry_price")
+    exit_price = _parse_float(normalized["exit_price"], "exit_price")
+    direction = _parse_direction(normalized["direction"])
 
     return TradeRecord(
         entry_time=_parse_datetime(normalized["entry_time"]),
         exit_time=_parse_datetime(normalized["exit_time"]),
-        side=_parse_side(normalized["side"]),
-        entry_price=_parse_float(normalized["entry_price"], "entry_price"),
-        exit_price=_parse_float(normalized["exit_price"], "exit_price"),
-        qty=_parse_int(normalized["qty"], "qty"),
-        slippage_points=_parse_float(normalized["slippage_points"], "slippage_points"),
-        fee_points=_parse_float(normalized["fee_points"], "fee_points"),
-        pnl_points=_parse_float(normalized["pnl_points"], "pnl_points"),
-        pnl_after_cost_points=_parse_float(
-            normalized["pnl_after_cost_points"],
-            "pnl_after_cost_points",
-        ),
+        entry_price=entry_price,
+        exit_price=exit_price,
+        direction=direction,
+        pnl=_calculate_pure_pnl(entry_price, exit_price, direction),
     )
+
+
+def _row_to_extended_trade_record(row: dict[str, str]) -> ExtendedTradeRecord:
+    normalized = _normalize_row(row)
+    _validate_columns(normalized, _BASE_REQUIRED_COLUMNS | _EXTENDED_REQUIRED_COLUMNS)
+
+    base = _row_to_trade_record(row)
+    qty = _parse_int(normalized["qty"], "qty")
+    slippage_points = _parse_float(normalized["slippage_points"], "slippage_points")
+    fee_points = _parse_float(normalized["fee_points"], "fee_points")
+
+    return ExtendedTradeRecord(
+        base=base,
+        qty=qty,
+        slippage_points=slippage_points,
+        fee_points=fee_points,
+        pnl_after_cost=(base.pnl * qty) - slippage_points - fee_points,
+    )
+
+
+def _normalize_row(row: dict[str, str]) -> dict[str, str]:
+    return {_normalize_column(key): value.strip() for key, value in row.items() if key}
 
 
 def _normalize_column(column: str) -> str:
     key = column.strip().lower().replace(" ", "_").replace("-", "_")
     return _COLUMN_ALIASES.get(key, key)
+
+
+def _validate_columns(row: dict[str, str], required: set[str]) -> None:
+    missing = required - set(row)
+    if missing:
+        raise ValueError(f"missing required trade columns: {sorted(missing)}")
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -140,13 +191,17 @@ def _parse_datetime(value: str) -> datetime:
         raise ValueError(f"invalid datetime: {value}") from exc
 
 
-def _parse_side(value: str) -> TradeSide:
-    side = value.strip().lower()
-    if side in {"long", "buy", "b"}:
-        return "long"
-    if side in {"short", "sell", "s"}:
-        return "short"
-    raise ValueError(f"invalid side: {value}")
+def _parse_direction(value: str) -> int:
+    direction = value.strip().lower()
+    if direction in {"1", "long", "buy", "b", "新買"}:
+        return 1
+    if direction in {"-1", "short", "sell", "s", "新賣", "新卖"}:
+        return -1
+    raise ValueError(f"invalid direction: {value}")
+
+
+def _calculate_pure_pnl(entry_price: float, exit_price: float, direction: int) -> float:
+    return (exit_price - entry_price) * direction
 
 
 def _parse_float(value: str, column: str) -> float:
