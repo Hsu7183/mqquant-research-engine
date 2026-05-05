@@ -25,23 +25,26 @@ REQUIRED_COLUMNS = {
 def _to_dataframe(trades: Iterable[TradeRecord] | pd.DataFrame) -> pd.DataFrame:
     if isinstance(trades, pd.DataFrame):
         df = trades.copy()
+        if df.empty:
+            raise ValueError("trades cannot be empty")
     else:
-        rows = []
-        for trade in trades:
-            if isinstance(trade, TradeRecord):
-                rows.append(asdict(trade))
-            elif isinstance(trade, dict):
-                rows.append(trade)
-            else:
-                raise TypeError("trades must be TradeRecord list, dict list, or DataFrame")
-        df = pd.DataFrame(rows)
+        trades_list = list(trades)
+        if len(trades_list) == 0:
+            raise ValueError("trades cannot be empty")
+        df = pd.DataFrame([t.__dict__ for t in trades_list])
 
-    missing = REQUIRED_COLUMNS - set(df.columns)
+    required_cols = {
+        "entry_time",
+        "exit_time",
+        "entry_price",
+        "exit_price",
+        "direction",
+        "pnl",
+    }
+
+    missing = required_cols - set(df.columns)
     if missing:
-        raise ValueError(f"missing required trade columns: {sorted(missing)}")
-
-    if df.empty:
-        raise ValueError("trade records cannot be empty")
+        raise ValueError(f"missing required columns: {missing}")
 
     return df
 
@@ -58,7 +61,27 @@ def evaluate_oos_trades(trades: Iterable[TradeRecord] | pd.DataFrame) -> dict[st
 
     This function does NOT generate strategy signals or orders.
     """
-    df = _to_dataframe(trades)
+    if isinstance(trades, pd.DataFrame):
+        prepared_trades = trades.copy()
+        if not prepared_trades.empty:
+            if "direction" not in prepared_trades.columns and "side" in prepared_trades.columns:
+                prepared_trades["direction"] = prepared_trades["side"]
+            if "pnl" not in prepared_trades.columns:
+                if "pnl_after_cost_points" in prepared_trades.columns:
+                    prepared_trades["pnl"] = prepared_trades["pnl_after_cost_points"]
+                elif "pnl_points" in prepared_trades.columns:
+                    prepared_trades["pnl"] = prepared_trades["pnl_points"]
+    else:
+        prepared_trades = trades
+
+    df = _to_dataframe(prepared_trades)
+
+    if "side" not in df.columns and "direction" in df.columns:
+        df["side"] = df["direction"]
+    if "pnl_after_cost_points" not in df.columns and "pnl" in df.columns:
+        df["pnl_after_cost_points"] = df["pnl"]
+    if "pnl_points" not in df.columns and "pnl" in df.columns:
+        df["pnl_points"] = df["pnl"]
 
     total_trades = int(len(df))
     net_col = df["pnl_after_cost_points"].astype(float)
