@@ -1,0 +1,210 @@
+{
+  "run_id": "20260506_0313plus_batch001",
+  "generated_at": "2026-05-06T00:00:00+00:00",
+  "summary": {
+    "total_strategies": 12,
+    "valid_strategies": 12
+  },
+  "top_10": [
+    {
+      "rank": 1,
+      "strategy_name": "0313plus_EB2_DB1_ATRS1p5_ATRTP2_TS20_IDX7",
+      "score": 93.52,
+      "total_test_net_profit": 128000,
+      "pass_rate": 0.83,
+      "max_test_mdd": 8700,
+      "average_test_pf": 1.72
+    },
+    {
+      "rank": 2,
+      "strategy_name": "0313plus_EB1_DB1_ATRS1p5_ATRTP2_TS20_IDX4",
+      "score": 90.18,
+      "total_test_net_profit": 119500,
+      "pass_rate": 0.78,
+      "max_test_mdd": 9100,
+      "average_test_pf": 1.65
+    },
+    {
+      "rank": 3,
+      "strategy_name": "0313plus_EB2_DB2_ATRS2_ATRTP2p5_TS30_IDX11",
+      "score": 88.41,
+      "total_test_net_profit": 113200,
+      "pass_rate": 0.72,
+      "max_test_mdd": 8200,
+      "average_test_pf": 1.61
+    },
+    {
+      "rank": 4,
+      "strategy_name": "0313plus_EB0_DB1_ATRS1_ATRTP2_TS20_IDX2",
+      "score": 84.73,
+      "total_test_net_profit": 103600,
+      "pass_rate": 0.67,
+      "max_test_mdd": 7600,
+      "average_test_pf": 1.54
+    },
+    {
+      "rank": 5,
+      "strategy_name": "0313plus_EB1_DB2_ATRS1p5_ATRTP2_TS30_IDX8",
+      "score": 82.94,
+      "total_test_net_profit": 98200,
+      "pass_rate": 0.67,
+      "max_test_mdd": 9900,
+      "average_test_pf": 1.49
+    },
+    {
+      "rank": 6,
+      "strategy_name": "0313plus_EB2_DB0_ATRS1_ATRTP1p5_TS20_IDX5",
+      "score": 79.6,
+      "total_test_net_profit": 90600,
+      "pass_rate": 0.61,
+      "max_test_mdd": 10400,
+      "average_test_pf": 1.43
+    },
+    {
+      "rank": 7,
+      "strategy_name": "0313plus_EB0_DB2_ATRS2_ATRTP2_TS30_IDX10",
+      "score": 76.22,
+      "total_test_net_profit": 84100,
+      "pass_rate": 0.56,
+      "max_test_mdd": 9400,
+      "average_test_pf": 1.38
+    },
+    {
+      "rank": 8,
+      "strategy_name": "0313plus_EB1_DB0_ATRS1_ATRTP2p5_TS20_IDX3",
+      "score": 72.85,
+      "total_test_net_profit": 76200,
+      "pass_rate": 0.5,
+      "max_test_mdd": 8800,
+      "average_test_pf": 1.31
+    },
+    {
+      "rank": 9,
+      "strategy_name": "0313plus_EB2_DB2_ATRS1_ATRTP1p5_TS30_IDX9",
+      "score": 69.34,
+      "total_test_net_profit": 68100,
+      "pass_rate": 0.44,
+      "max_test_mdd": 11200,
+      "average_test_pf": 1.24
+    },
+    {
+      "rank": 10,
+      "strategy_name": "0313plus_EB0_DB0_ATRS1_ATRTP1p5_TS20_IDX1",
+      "score": 64.9,
+      "total_test_net_profit": 59400,
+      "pass_rate": 0.39,
+      "max_test_mdd": 12100,
+      "average_test_pf": 1.18
+    }
+  ],
+  "all_results": [
+    {
+      "rank": 1,
+      "strategy_name": "0313plus_EB2_DB1_ATRS1p5_ATRTP2_TS20_IDX7",
+      "score": 93.52,
+      "total_test_net_profit": 128000,
+      "pass_rate": 0.83,
+      "max_test_mdd": 8700,
+      "average_test_pf": 1.72
+    },
+    {
+      "rank": 2,
+      "strategy_name": "0313plus_EB1_DB1_ATRS1p5_ATRTP2_TS20_IDX4",
+      "score": 90.18,
+      "total_test_net_profit": 119500,
+      "pass_rate": 0.78,
+      "max_test_mdd": 9100,
+      "average_test_pf": 1.65
+    },
+    {
+      "rank": 3,
+      "strategy_name": "0313plus_EB2_DB2_ATRS2_ATRTP2p5_TS30_IDX11",
+      "score": 88.41,
+      "total_test_net_profit": 113200,
+      "pass_rate": 0.72,
+      "max_test_mdd": 8200,
+      "average_test_pf": 1.61
+    },
+    {
+      "rank": 4,
+      "strategy_name": "0313plus_EB0_DB1_ATRS1_ATRTP2_TS20_IDX2",
+      "score": 84.73,
+      "total_test_net_profit": 103600,
+      "pass_rate": 0.67,
+      "max_test_mdd": 7600,
+      "average_test_pf": 1.54
+    },
+    {
+      "rank": 5,
+      "strategy_name": "0313plus_EB1_DB2_ATRS1p5_ATRTP2_TS30_IDX8",
+      "score": 82.94,
+      "total_test_net_profit": 98200,
+      "pass_rate": 0.67,
+      "max_test_mdd": 9900,
+      "average_test_pf": 1.49
+    },
+    {
+      "rank": 6,
+      "strategy_name": "0313plus_EB2_DB0_ATRS1_ATRTP1p5_TS20_IDX5",
+      "score": 79.6,
+      "total_test_net_profit": 90600,
+      "pass_rate": 0.61,
+      "max_test_mdd": 10400,
+      "average_test_pf": 1.43
+    },
+    {
+      "rank": 7,
+      "strategy_name": "0313plus_EB0_DB2_ATRS2_ATRTP2_TS30_IDX10",
+      "score": 76.22,
+      "total_test_net_profit": 84100,
+      "pass_rate": 0.56,
+      "max_test_mdd": 9400,
+      "average_test_pf": 1.38
+    },
+    {
+      "rank": 8,
+      "strategy_name": "0313plus_EB1_DB0_ATRS1_ATRTP2p5_TS20_IDX3",
+      "score": 72.85,
+      "total_test_net_profit": 76200,
+      "pass_rate": 0.5,
+      "max_test_mdd": 8800,
+      "average_test_pf": 1.31
+    },
+    {
+      "rank": 9,
+      "strategy_name": "0313plus_EB2_DB2_ATRS1_ATRTP1p5_TS30_IDX9",
+      "score": 69.34,
+      "total_test_net_profit": 68100,
+      "pass_rate": 0.44,
+      "max_test_mdd": 11200,
+      "average_test_pf": 1.24
+    },
+    {
+      "rank": 10,
+      "strategy_name": "0313plus_EB0_DB0_ATRS1_ATRTP1p5_TS20_IDX1",
+      "score": 64.9,
+      "total_test_net_profit": 59400,
+      "pass_rate": 0.39,
+      "max_test_mdd": 12100,
+      "average_test_pf": 1.18
+    },
+    {
+      "rank": 11,
+      "strategy_name": "0313plus_EB1_DB2_ATRS2_ATRTP1p5_TS20_IDX12",
+      "score": 59.12,
+      "total_test_net_profit": 48200,
+      "pass_rate": 0.33,
+      "max_test_mdd": 13400,
+      "average_test_pf": 1.08
+    },
+    {
+      "rank": 12,
+      "strategy_name": "0313plus_EB0_DB1_ATRS2_ATRTP1p5_TS30_IDX6",
+      "score": 54.5,
+      "total_test_net_profit": 40100,
+      "pass_rate": 0.28,
+      "max_test_mdd": 14100,
+      "average_test_pf": 1.02
+    }
+  ]
+}
