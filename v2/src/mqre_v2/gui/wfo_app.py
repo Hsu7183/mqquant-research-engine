@@ -12,6 +12,10 @@ import pandas as pd
 
 from mqre_v2.optimizer.parameter_grid import expand_parameter_grid, load_parameter_grid
 from mqre_v2.optimizer.xs_batch import generate_xs_batch
+from mqre_v2.pipeline.txt_wfo_pipeline import (
+    export_pipeline_result,
+    run_txt_wfo_pipeline,
+)
 from mqre_v2.reporting.wfo_report import decision_result_to_dict, wfo_run_result_to_dict
 from mqre_v2.validation.decision import compare_baseline_challenger, score_wfo_summary
 from mqre_v2.validation.wfo import (
@@ -426,12 +430,31 @@ def _render_batch_ranking_mode(st: Any) -> None:
     with st.sidebar:
         txt_folder_path = st.text_input("txt_folder_path")
         file_pattern = st.text_input("file_pattern", value="*.txt")
+        output_json_path = st.text_input(
+            "output_json_path",
+            value="outputs/txt_wfo_pipeline.json",
+        )
         config = {
             "txt_folder_path": txt_folder_path,
             "file_pattern": file_pattern,
             **_wfo_parameter_inputs(st),
         }
         run_clicked = st.button("執行批量排名")
+        pipeline_clicked = st.button("執行完整 Pipeline")
+
+    if pipeline_clicked:
+        try:
+            pipeline_results = run_txt_wfo_pipeline(
+                txt_folder=txt_folder_path,
+                start_date=_coerce_date(config["start_date"]),
+                end_date=_coerce_date(config["end_date"]),
+                gate_config=config,
+            )
+            export_pipeline_result(pipeline_results, output_json_path)
+        except Exception as exc:
+            st.error(str(exc))
+        else:
+            _render_txt_wfo_pipeline_result(st, pipeline_results, output_json_path)
 
     if not run_clicked:
         return
@@ -620,6 +643,35 @@ def _render_batch_ranking_result(st: Any, results: list[dict]) -> None:
         "下載批量排名 JSON",
         data=json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
         file_name="batch_txt_ranking_report.json",
+        mime="application/json",
+    )
+
+
+def _render_txt_wfo_pipeline_result(
+    st: Any,
+    results: list[dict],
+    output_json_path: str,
+) -> None:
+    if not results:
+        st.warning("No TXT files matched the pipeline input.")
+        st.write({"output_json_path": output_json_path})
+        return
+
+    payload = {
+        "generated_at": _generated_at(),
+        "total_strategies": len(results),
+        "top_10": results[:10],
+        "all_results": results,
+    }
+    table = pd.DataFrame(results)
+
+    st.subheader("Pipeline Top 10")
+    st.dataframe(table.head(10), use_container_width=True)
+    st.write({"output_json_path": output_json_path})
+    st.download_button(
+        "下載 Pipeline JSON",
+        data=json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+        file_name=Path(output_json_path).name,
         mime="application/json",
     )
 
