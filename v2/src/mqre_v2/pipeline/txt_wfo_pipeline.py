@@ -8,6 +8,7 @@ from typing import Any
 
 from mqre_v2.backtest.costs import CostConfig, trade_cost_breakdown
 from mqre_v2.io.txt_parser import parse_xs_txt
+from mqre_v2.jobs.job_manager import JobStopped, is_stop_requested, update_progress
 from mqre_v2.validation.decision import score_wfo_summary
 from mqre_v2.validation.wfo import (
     TxtWfoInput,
@@ -42,6 +43,8 @@ def run_txt_wfo_pipeline(
     include_wfo_details: bool = False,
     cost_config: CostConfig | None = None,
     strategy_quality: dict[str, dict[str, Any]] | None = None,
+    job_id: str | None = None,
+    job_base_dir: str = "runs/jobs",
 ) -> list[dict]:
     folder = Path(txt_folder)
     if not folder.is_dir():
@@ -52,8 +55,36 @@ def run_txt_wfo_pipeline(
     if txt_filenames is not None:
         allowed_names = {Path(filename).name for filename in txt_filenames}
 
+    txt_paths = [
+        path
+        for path in sorted(folder.glob("*.txt"))
+        if path.is_file() and (allowed_names is None or path.name in allowed_names)
+    ]
+    if job_id:
+        update_progress(
+            job_id,
+            {
+                "total": len(txt_paths),
+                "completed": 0,
+                "current": "",
+            },
+            base_dir=job_base_dir,
+        )
+
     results: list[dict] = []
-    for txt_path in sorted(folder.glob("*.txt")):
+    for index, txt_path in enumerate(txt_paths, start=1):
+        if job_id and is_stop_requested(job_id, base_dir=job_base_dir):
+            raise JobStopped(f"stop requested for job {job_id}")
+        if job_id:
+            update_progress(
+                job_id,
+                {
+                    "total": len(txt_paths),
+                    "completed": index - 1,
+                    "current": txt_path.stem,
+                },
+                base_dir=job_base_dir,
+            )
         if not txt_path.is_file():
             continue
         if allowed_names is not None and txt_path.name not in allowed_names:
@@ -146,6 +177,16 @@ def run_txt_wfo_pipeline(
                 result["round_results"] = []
 
         results.append(result)
+        if job_id:
+            update_progress(
+                job_id,
+                {
+                    "total": len(txt_paths),
+                    "completed": index,
+                    "current": strategy_name,
+                },
+                base_dir=job_base_dir,
+            )
 
     results.sort(key=lambda item: float(item["score"]), reverse=True)
     for rank, result in enumerate(results, start=1):

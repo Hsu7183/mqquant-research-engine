@@ -7,6 +7,14 @@ from pathlib import Path
 from typing import Sequence
 
 from mqre_v2.backtest.costs import CostConfig
+from mqre_v2.jobs.job_manager import (
+    JobStopped,
+    complete_job,
+    create_job,
+    fail_job,
+    stop_job,
+    update_progress,
+)
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_pipeline import (
@@ -24,7 +32,9 @@ def get_latest_run(base_dir: str) -> str:
     if not base_path.is_dir():
         raise ValueError(f"run base directory not found: {base_dir}")
 
-    run_dirs = sorted(path for path in base_path.iterdir() if path.is_dir())
+    run_dirs = sorted(
+        path for path in base_path.iterdir() if path.is_dir() and path.name != "jobs"
+    )
     if not run_dirs:
         raise ValueError(f"no run directories found in: {base_dir}")
 
@@ -38,25 +48,37 @@ def run_latest_pipeline(
     output_filename: str = "ranking.json",
     cost_config: CostConfig | None = None,
     strategy_quality: dict | None = None,
+    job_id: str | None = None,
 ) -> dict:
     start = start_date or date(2020, 1, 1)
     end = end_date or date.today()
     effective_cost = cost_config or CostConfig()
+    job_base_dir = str(Path(base_dir) / "jobs")
 
     run_path = get_latest_run(base_dir)
     manifest_path = Path(run_path) / "manifest.json"
     if not manifest_path.is_file():
         txt_dir = Path(run_path) / "txt"
         if txt_dir.is_dir() and any(txt_dir.glob("*.txt")):
-            ranking = run_txt_wfo_pipeline(
-                txt_folder=str(txt_dir),
-                start_date=start,
-                end_date=end,
-                gate_config={},
-                include_wfo_details=True,
-                cost_config=effective_cost,
-                strategy_quality=strategy_quality,
-            )
+            effective_job_id = job_id or create_job(base_dir=job_base_dir)
+            try:
+                ranking = run_txt_wfo_pipeline(
+                    txt_folder=str(txt_dir),
+                    start_date=start,
+                    end_date=end,
+                    gate_config={},
+                    include_wfo_details=True,
+                    cost_config=effective_cost,
+                    strategy_quality=strategy_quality,
+                    job_id=effective_job_id,
+                    job_base_dir=job_base_dir,
+                )
+            except JobStopped:
+                stop_job(effective_job_id, base_dir=job_base_dir)
+                raise
+            except Exception as exc:
+                fail_job(effective_job_id, str(exc), base_dir=job_base_dir)
+                raise
             ranking_path = Path(run_path) / "reports" / output_filename
             report_rows = [_to_report_row(item) for item in ranking]
             detail_paths = _write_strategy_detail_reports(
@@ -75,6 +97,7 @@ def run_latest_pipeline(
                 _build_report_payload(Path(run_path).name, report_rows),
                 str(ranking_path),
             )
+            complete_job(effective_job_id, base_dir=job_base_dir)
             return {
                 "run_id": Path(run_path).name,
                 "run_path": run_path,
@@ -83,6 +106,7 @@ def run_latest_pipeline(
                 "output_json_path": str(ranking_path),
                 "detail_json_count": len(detail_paths),
                 "artifact_count": len(artifact_paths),
+                "job_id": effective_job_id,
                 "details_generated_from": "txt",
                 "top_10": ranking[:10],
             }
@@ -96,12 +120,19 @@ def run_latest_pipeline(
         detail_paths = write_ranking_summary_detail_reports(str(ranking_path))
         report = json.loads(ranking_path.read_text(encoding="utf-8"))
         ranking = report.get("all_results", []) or report.get("top_10", [])
+        effective_job_id = job_id or create_job(base_dir=job_base_dir)
+        update_progress(
+            effective_job_id,
+            {"total": 1, "completed": 1, "current": "ranking_summary"},
+            base_dir=job_base_dir,
+        )
         artifact_paths = export_dashboard_artifacts_from_ranking(
             root=Path(run_path),
             run_id=str(report.get("run_id", Path(run_path).name)),
             ranking=ranking,
             cost_config=effective_cost,
         )
+        complete_job(effective_job_id, base_dir=job_base_dir)
         return {
             "run_id": report.get("run_id", Path(run_path).name),
             "run_path": run_path,
@@ -110,6 +141,7 @@ def run_latest_pipeline(
             "output_json_path": str(ranking_path),
             "detail_json_count": len(detail_paths),
             "artifact_count": len(artifact_paths),
+            "job_id": effective_job_id,
             "details_generated_from": "ranking_summary",
             "top_10": report.get("top_10", []),
         }
@@ -120,6 +152,8 @@ def run_latest_pipeline(
         end_date=end,
         output_filename=output_filename,
         cost_config=effective_cost,
+        job_id=job_id,
+        job_base_dir=job_base_dir,
     )
 
     return {
@@ -129,6 +163,7 @@ def run_latest_pipeline(
         "valid_txt": result.valid_txt,
         "output_json_path": result.output_json_path,
         "artifact_count": 9,
+        "job_id": result.job_id,
         "top_10": result.ranking[:10],
     }
 

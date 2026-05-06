@@ -11,6 +11,13 @@ from mqre_v2.backtest.costs import CostConfig, net_pnl_points_for_trade, trade_c
 from mqre_v2.core.trades import TradeRecord
 from mqre_v2.export.artifact_exporter import export_latest_run
 from mqre_v2.io.txt_parser import parse_xs_txt
+from mqre_v2.jobs.job_manager import (
+    JobStopped,
+    complete_job,
+    create_job,
+    fail_job,
+    stop_job,
+)
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_manager import load_manifest, write_manifest
@@ -27,6 +34,7 @@ class RunPipelineResult:
     valid_txt: int
     ranking: list[dict]
     output_json_path: str
+    job_id: str
 
 
 def run_pipeline_from_run(
@@ -35,54 +43,69 @@ def run_pipeline_from_run(
     end_date: date,
     output_filename: str = "ranking.json",
     cost_config: CostConfig | None = None,
+    job_id: str | None = None,
+    job_base_dir: str | None = None,
 ) -> RunPipelineResult:
-    validation = validate_run_txt(run_path)
-    if len(validation.valid_txt) == 0:
-        raise ValueError("no valid TXT files for run pipeline")
-
-    manifest = load_manifest(run_path)
     root = Path(run_path)
-    txt_folder = root / "txt"
-    effective_cost = cost_config or CostConfig()
-    ranking = run_txt_wfo_pipeline(
-        txt_folder=str(txt_folder),
-        start_date=start_date,
-        end_date=end_date,
-        gate_config={},
-        txt_filenames=validation.valid_txt,
-        include_wfo_details=True,
-        cost_config=effective_cost,
-    )
+    effective_job_base = job_base_dir or str(root.parent / "jobs")
+    effective_job_id = job_id or create_job(base_dir=effective_job_base)
+    try:
+        validation = validate_run_txt(run_path)
+        if len(validation.valid_txt) == 0:
+            raise ValueError("no valid TXT files for run pipeline")
 
-    output_path = root / "reports" / output_filename
-    report_rows = [_to_report_row(item) for item in ranking]
-    _write_strategy_detail_reports(root, manifest.run_id, ranking, effective_cost)
-    export_dashboard_artifacts_from_ranking(
-        root=root,
-        run_id=manifest.run_id,
-        ranking=ranking,
-        cost_config=effective_cost,
-    )
-    export_json_report(
-        _build_report_payload(manifest.run_id, report_rows),
-        str(output_path),
-    )
+        manifest = load_manifest(run_path)
+        txt_folder = root / "txt"
+        effective_cost = cost_config or CostConfig()
+        ranking = run_txt_wfo_pipeline(
+            txt_folder=str(txt_folder),
+            start_date=start_date,
+            end_date=end_date,
+            gate_config={},
+            txt_filenames=validation.valid_txt,
+            include_wfo_details=True,
+            cost_config=effective_cost,
+            job_id=effective_job_id,
+            job_base_dir=effective_job_base,
+        )
 
-    updated_manifest = replace(
-        manifest,
-        pipeline_completed=True,
-        pipeline_total=len(ranking),
-        pipeline_valid=len(validation.valid_txt),
-    )
-    write_manifest(run_path, updated_manifest)
+        output_path = root / "reports" / output_filename
+        report_rows = [_to_report_row(item) for item in ranking]
+        _write_strategy_detail_reports(root, manifest.run_id, ranking, effective_cost)
+        export_dashboard_artifacts_from_ranking(
+            root=root,
+            run_id=manifest.run_id,
+            ranking=ranking,
+            cost_config=effective_cost,
+        )
+        export_json_report(
+            _build_report_payload(manifest.run_id, report_rows),
+            str(output_path),
+        )
 
-    return RunPipelineResult(
-        run_id=manifest.run_id,
-        total_strategies=len(ranking),
-        valid_txt=len(validation.valid_txt),
-        ranking=ranking,
-        output_json_path=str(output_path),
-    )
+        updated_manifest = replace(
+            manifest,
+            pipeline_completed=True,
+            pipeline_total=len(ranking),
+            pipeline_valid=len(validation.valid_txt),
+        )
+        write_manifest(run_path, updated_manifest)
+        complete_job(effective_job_id, base_dir=effective_job_base)
+
+        return RunPipelineResult(
+            run_id=manifest.run_id,
+            total_strategies=len(ranking),
+            valid_txt=len(validation.valid_txt),
+            ranking=ranking,
+            output_json_path=str(output_path),
+            job_id=effective_job_id,
+        )
+    except JobStopped:
+        stop_job(effective_job_id, base_dir=effective_job_base)
+        raise
+    except Exception as exc:
+        fail_job(effective_job_id, str(exc), base_dir=effective_job_base)
+        raise
 
 
 def export_dashboard_artifacts_from_ranking(
