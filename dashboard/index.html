@@ -14,7 +14,8 @@
           <p class="eyebrow">1001plus artifact viewer</p>
           <h1>mqquant dashboard (1001plus)</h1>
           <p class="subtitle">
-            只讀取本機 <code>runs/latest/</code> mock artifacts，不執行回測、最佳化或 heavy compute。
+            讀取本機 <code>runs/latest/</code> artifacts，並可監看
+            <code>runs/jobs/{job_id}/</code> pipeline progress。Dashboard 不執行 heavy compute。
           </p>
         </div>
         <div class="source-pill" id="data-source">Loading artifacts...</div>
@@ -22,6 +23,49 @@
 
       <section id="error-panel" class="error-card hidden">
         請用本機伺服器開啟（不要用 file://）
+      </section>
+
+      <section class="card job-card" aria-label="Job Monitor">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Job Monitor</p>
+            <h2>Pipeline Progress</h2>
+          </div>
+          <label class="auto-refresh">
+            <input id="job-auto-refresh" type="checkbox" />
+            <span>Auto refresh</span>
+          </label>
+        </div>
+
+        <div class="job-controls">
+          <input id="job-id-input" type="text" placeholder="輸入 job_id，例如 20260506183455_3761c6f8" />
+          <button id="job-load-button" type="button">載入</button>
+        </div>
+
+        <div class="job-message" id="job-message">尚未指定 job_id</div>
+        <div class="job-progress-track" aria-label="job progress">
+          <div class="job-progress-bar" id="job-progress-bar"></div>
+        </div>
+
+        <div class="job-grid">
+          <div>
+            <span>status</span>
+            <strong id="job-status">--</strong>
+          </div>
+          <div>
+            <span>completed / total</span>
+            <strong id="job-count">--</strong>
+          </div>
+          <div>
+            <span>percent</span>
+            <strong id="job-percent">--</strong>
+          </div>
+          <div>
+            <span>current</span>
+            <strong id="job-current">--</strong>
+          </div>
+        </div>
+        <p class="reason job-error" id="job-error">--</p>
       </section>
 
       <section class="grid summary-grid" aria-label="Run Summary">

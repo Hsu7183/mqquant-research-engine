@@ -44,3 +44,44 @@ http://localhost:8000/dashboard/
 - Browser `fetch()` calls are blocked or inconsistent under `file://`.
 - The dashboard does not run backtests, optimization, WFO, OOS, or risk calculation.
 - Python produces artifacts; HTML / JS only reads artifacts and renders tables/charts.
+
+## 5. Monitor A Pipeline Job
+
+Run the latest pipeline with progress output:
+
+```bash
+python scripts/run_with_progress.py
+```
+
+The script prints a line like:
+
+```text
+job_id=20260506183455_3761c6f8
+```
+
+It also writes:
+
+- `runs/jobs/{job_id}/status.json`
+- `runs/jobs/{job_id}/progress.json`
+
+Start the local server:
+
+```bash
+python -m http.server 8000
+```
+
+Open:
+
+```text
+http://localhost:8000/dashboard/
+```
+
+Paste the printed `job_id` into the Job Monitor input and click `載入`.
+
+To keep watching the job, check `Auto refresh`. The dashboard reads
+`status.json` and `progress.json` every 2 seconds until the job reaches
+`completed`, `failed`, or `stopped`.
+
+If no `job_id` is entered, the dashboard shows `尚未指定 job_id`.
+
+If the files are missing, the dashboard shows `找不到 job 或尚未產生 progress`.

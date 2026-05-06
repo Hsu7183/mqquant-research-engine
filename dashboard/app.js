@@ -1,4 +1,5 @@
 const ARTIFACT_BASE = "/runs/latest";
+const JOB_BASE = "/runs/jobs";
 
 const artifacts = {
   ranking: "ranking.json",
@@ -13,8 +14,10 @@ const artifacts = {
 
 let equityChart = null;
 let drawdownChart = null;
+let jobRefreshTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+  bindJobMonitor();
   loadDashboard().catch((error) => {
     console.error(error);
     showFetchError();
@@ -66,6 +69,102 @@ async function fetchCsv(filename) {
     throw new Error(`Failed to fetch ${filename}: ${response.status}`);
   }
   return parseCsv(await response.text());
+}
+
+function bindJobMonitor() {
+  const loadButton = document.getElementById("job-load-button");
+  const input = document.getElementById("job-id-input");
+  const checkbox = document.getElementById("job-auto-refresh");
+
+  loadButton.addEventListener("click", () => {
+    loadJobMonitor();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      loadJobMonitor();
+    }
+  });
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) {
+      loadJobMonitor();
+      jobRefreshTimer = window.setInterval(loadJobMonitor, 2000);
+    } else {
+      stopJobAutoRefresh();
+    }
+  });
+
+  renderJobEmptyState("尚未指定 job_id");
+}
+
+async function loadJobMonitor() {
+  const jobId = document.getElementById("job-id-input").value.trim();
+  if (!jobId) {
+    renderJobEmptyState("尚未指定 job_id");
+    return;
+  }
+
+  try {
+    const [status, progress] = await Promise.all([
+      fetchJobJson(jobId, "status.json"),
+      fetchJobJson(jobId, "progress.json"),
+    ]);
+    renderJobMonitor(jobId, status, progress);
+  } catch (error) {
+    console.error(error);
+    renderJobMissingState("找不到 job 或尚未產生 progress");
+  }
+}
+
+async function fetchJobJson(jobId, filename) {
+  const safeJobId = encodeURIComponent(jobId);
+  const response = await fetch(`${JOB_BASE}/${safeJobId}/${filename}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch job ${filename}: ${response.status}`);
+  }
+  return response.json();
+}
+
+function renderJobMonitor(jobId, status, progress) {
+  const completed = Number(progress.completed ?? 0);
+  const total = Number(progress.total ?? 0);
+  const percent = Number(progress.percent ?? (total ? (completed / total) * 100 : 0));
+  const boundedPercent = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+
+  document.getElementById("job-message").textContent = `job_id: ${jobId}`;
+  document.getElementById("job-status").textContent = status.status ?? "--";
+  document.getElementById("job-count").textContent = `${formatInteger(completed)} / ${formatInteger(total)}`;
+  document.getElementById("job-percent").textContent = `${boundedPercent.toFixed(2)}%`;
+  document.getElementById("job-current").textContent = progress.current || "--";
+  document.getElementById("job-error").textContent = status.error || "--";
+  document.getElementById("job-progress-bar").style.width = `${boundedPercent}%`;
+
+  if (["completed", "failed", "stopped"].includes(status.status)) {
+    stopJobAutoRefresh();
+    document.getElementById("job-auto-refresh").checked = false;
+  }
+}
+
+function renderJobEmptyState(message) {
+  document.getElementById("job-message").textContent = message;
+  document.getElementById("job-status").textContent = "--";
+  document.getElementById("job-count").textContent = "--";
+  document.getElementById("job-percent").textContent = "--";
+  document.getElementById("job-current").textContent = "--";
+  document.getElementById("job-error").textContent = "--";
+  document.getElementById("job-progress-bar").style.width = "0%";
+}
+
+function renderJobMissingState(message) {
+  renderJobEmptyState(message);
+}
+
+function stopJobAutoRefresh() {
+  if (jobRefreshTimer !== null) {
+    window.clearInterval(jobRefreshTimer);
+    jobRefreshTimer = null;
+  }
 }
 
 function parseCsv(text) {
