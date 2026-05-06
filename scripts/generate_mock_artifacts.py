@@ -234,12 +234,50 @@ def _build_decision_audit() -> dict[str, object]:
     return {
         "baseline_strategy": "1001plus_baseline",
         "challenger_strategy": "1001plus_0001",
-        "promotion_decision": "review_required",
+        "promotion_decision": "promote",
         "reason": (
-            "mock challenger passed ranking and WFO thresholds; human review is "
-            "still required before promotion."
+            "mock challenger passed ranking, OOS, WFO, and risk thresholds; human "
+            "review is still required before promotion."
         ),
         "timestamp": _iso(datetime(2026, 5, 7, 9, 0, tzinfo=timezone.utc)),
+        "recommend_promote": True,
+        "requires_human_review": True,
+        "score": 128.4,
+        "risk_warnings": [],
+        "checks": {
+            "ranking": {
+                "score": 128.4,
+                "min_score": 100.0,
+                "profit_factor": 1.7,
+                "min_profit_factor": 1.1,
+                "trade_count": 388,
+                "min_trade_count": 30,
+            },
+            "oos": {
+                "oos_sharpe": 1.18,
+                "min_oos_sharpe": 1.0,
+                "oos_return": 0.162,
+                "min_oos_return": 0.0,
+                "oos_mdd": 9150.0,
+                "max_oos_mdd": 15000.0,
+            },
+            "wfo": {
+                "pass_rate": 0.667,
+                "min_pass_rate": 0.6,
+                "avg_sharpe": 1.125,
+                "min_avg_sharpe": 1.0,
+                "stability_score": 0.74,
+                "min_stability_score": 0.6,
+            },
+            "risk": {
+                "max_dd": 9650.0,
+                "max_risk_drawdown": 15000.0,
+                "ulcer_index": 3.86,
+                "max_ulcer_index": 10.0,
+                "recovery_days": 17,
+                "max_recovery_days": 60,
+            },
+        },
     }
 
 

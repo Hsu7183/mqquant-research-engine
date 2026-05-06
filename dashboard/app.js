@@ -348,7 +348,49 @@ function renderDecisionAudit(audit) {
   document.getElementById("audit-baseline").textContent = audit.baseline_strategy ?? "--";
   document.getElementById("audit-challenger").textContent = audit.challenger_strategy ?? "--";
   document.getElementById("audit-decision").textContent = audit.promotion_decision ?? "--";
+  document.getElementById("audit-recommendation").textContent =
+    audit.recommend_promote === true
+      ? "Promote"
+      : audit.recommend_promote === false
+        ? "Do not promote"
+        : "Review required";
+  document.getElementById("audit-score").textContent = formatNumber(audit.score, 2);
+  document.getElementById("audit-review").textContent =
+    audit.requires_human_review === false ? "No" : "Required";
   document.getElementById("audit-reason").textContent = audit.reason ?? "--";
+  document.getElementById("audit-warnings").textContent = formatWarnings(audit.risk_warnings);
+  renderAuditChecks(audit.checks ?? {});
+}
+
+function renderAuditChecks(checks) {
+  const body = document.getElementById("audit-checks-body");
+  body.innerHTML = "";
+
+  const rows = [
+    ["ranking", "score", checks.ranking?.score, checks.ranking?.min_score],
+    ["ranking", "profit_factor", checks.ranking?.profit_factor, checks.ranking?.min_profit_factor],
+    ["ranking", "trade_count", checks.ranking?.trade_count, checks.ranking?.min_trade_count],
+    ["oos", "oos_sharpe", checks.oos?.oos_sharpe, checks.oos?.min_oos_sharpe],
+    ["oos", "oos_return", checks.oos?.oos_return, checks.oos?.min_oos_return],
+    ["oos", "oos_mdd", checks.oos?.oos_mdd, checks.oos?.max_oos_mdd],
+    ["wfo", "pass_rate", checks.wfo?.pass_rate, checks.wfo?.min_pass_rate],
+    ["wfo", "avg_sharpe", checks.wfo?.avg_sharpe, checks.wfo?.min_avg_sharpe],
+    ["wfo", "stability_score", checks.wfo?.stability_score, checks.wfo?.min_stability_score],
+    ["risk", "max_dd", checks.risk?.max_dd, checks.risk?.max_risk_drawdown],
+    ["risk", "ulcer_index", checks.risk?.ulcer_index, checks.risk?.max_ulcer_index],
+    ["risk", "recovery_days", checks.risk?.recovery_days, checks.risk?.max_recovery_days],
+  ];
+
+  rows.forEach(([group, metric, value, threshold]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(group)}</td>
+      <td>${escapeHtml(metric)}</td>
+      <td>${formatAuditValue(value)}</td>
+      <td>${formatAuditValue(threshold)}</td>
+    `;
+    body.appendChild(tr);
+  });
 }
 
 function baseChartOptions() {
@@ -428,6 +470,23 @@ function formatPercent(value) {
     return "--";
   }
   return `${(number * 100).toFixed(2)}%`;
+}
+
+function formatWarnings(warnings) {
+  if (!Array.isArray(warnings) || warnings.length === 0) {
+    return "No risk warnings";
+  }
+  return warnings.join("; ");
+}
+
+function formatAuditValue(value) {
+  if (value === undefined || value === null || value === "") {
+    return "--";
+  }
+  if (typeof value === "number") {
+    return formatNumber(value, Math.abs(value) >= 10 ? 2 : 4);
+  }
+  return escapeHtml(value);
 }
 
 function escapeHtml(value) {

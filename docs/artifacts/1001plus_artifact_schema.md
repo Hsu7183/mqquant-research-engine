@@ -286,9 +286,19 @@ Expected shape:
 {
   "baseline_strategy": "1001plus_baseline",
   "challenger_strategy": "1001plus_0001",
-  "promotion_decision": "review_required",
+  "promotion_decision": "promote",
   "reason": "challenger passed score and WFO thresholds",
-  "timestamp": "2026-05-07T00:00:00+08:00"
+  "timestamp": "2026-05-07T00:00:00+08:00",
+  "recommend_promote": true,
+  "requires_human_review": true,
+  "score": 128.4,
+  "risk_warnings": [],
+  "checks": {
+    "ranking": {},
+    "oos": {},
+    "wfo": {},
+    "risk": {}
+  }
 }
 ```
 
@@ -301,10 +311,20 @@ Fields:
 - `reason`: human-readable explanation of the decision. Should reference score,
   OOS, WFO, risk, forward test, or robustness conditions when relevant.
 - `timestamp`: ISO 8601 timestamp when the decision record was generated.
+- `recommend_promote`: boolean recommendation flag. True only when ranking, OOS,
+  WFO, and risk checks all pass the configured promotion thresholds.
+- `requires_human_review`: must remain true for research governance. The system may
+  recommend promotion, but it must not auto-deploy or auto-trade.
+- `score`: challenger score used for the recommendation.
+- `risk_warnings`: list of failed or watch-zone checks, such as score, OOS Sharpe,
+  WFO pass rate, drawdown, ulcer index, or recovery days.
+- `checks`: threshold audit object. It should include the metric values and
+  thresholds used for ranking, OOS, WFO, and risk checks.
 
 Calculation notes:
 
-- The pipeline or decision module produces this file.
+- The pipeline or decision module produces this file from `ranking.json`,
+  `oos_summary.json`, `wfo_summary.json`, and `risk_report.json`.
 - The dashboard reads and displays it.
 - A promotion recommendation is not an automated trade or deployment action.
 

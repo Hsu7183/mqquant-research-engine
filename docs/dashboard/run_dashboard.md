@@ -45,7 +45,33 @@ http://localhost:8000/dashboard/
 - The dashboard does not run backtests, optimization, WFO, OOS, or risk calculation.
 - Python produces artifacts; HTML / JS only reads artifacts and renders tables/charts.
 
-## 5. Monitor A Pipeline Job
+## 5. Generate A Decision Audit
+
+The promotion recommendation / decision audit engine reads these artifacts:
+
+- `runs/latest/ranking.json`
+- `runs/latest/oos_summary.json`
+- `runs/latest/wfo_summary.json`
+- `runs/latest/risk_report.json`
+
+Generate or refresh `runs/latest/decision_audit.json`:
+
+```bash
+python -m mqre_v2.cli.generate_decision_audit --artifact-dir runs/latest
+```
+
+The dashboard then displays:
+
+- baseline strategy
+- challenger strategy
+- promotion decision
+- recommendation
+- score
+- human review requirement
+- risk warnings
+- ranking / OOS / WFO / risk threshold checks
+
+## 6. Monitor A Pipeline Job
 
 Run the latest pipeline with progress output:
 

@@ -226,7 +226,8 @@ code {
 }
 
 .metric-card span,
-.decision-grid span {
+.decision-grid span,
+.audit-warning-box span {
   color: var(--muted);
   display: block;
   font-size: 13px;
@@ -322,6 +323,23 @@ dd {
   gap: 14px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 16px;
+}
+
+.audit-warning-box {
+  margin: 14px 0;
+}
+
+.audit-warning-box p {
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: 12px;
+  color: #fed7aa;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.compact-table {
+  min-width: 620px;
 }
 
 .reason {

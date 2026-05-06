@@ -1,5 +1,11 @@
 """Auto decision recommendation helpers for mqre_v2."""
 
+from mqre_v2.decision.artifact_decision import (
+    ArtifactDecisionAudit,
+    ArtifactDecisionConfig,
+    build_decision_audit,
+    export_decision_audit_from_artifacts,
+)
 from mqre_v2.decision.audit_log import (
     DecisionAuditRecord,
     append_decision_audit,
@@ -17,10 +23,14 @@ from mqre_v2.decision.promotion_pipeline import (
 )
 
 __all__ = [
+    "ArtifactDecisionAudit",
+    "ArtifactDecisionConfig",
     "AutoPromotionConfig",
     "DecisionAuditRecord",
     "PromotionRecommendation",
     "append_decision_audit",
+    "build_decision_audit",
+    "export_decision_audit_from_artifacts",
     "export_recommendation_report",
     "generate_promotion_recommendation",
     "read_decision_audit",

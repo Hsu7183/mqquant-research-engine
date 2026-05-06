@@ -194,8 +194,37 @@
             <span>decision</span>
             <strong id="audit-decision">--</strong>
           </div>
+          <div>
+            <span>recommendation</span>
+            <strong id="audit-recommendation">--</strong>
+          </div>
+          <div>
+            <span>score</span>
+            <strong id="audit-score">--</strong>
+          </div>
+          <div>
+            <span>human review</span>
+            <strong id="audit-review">--</strong>
+          </div>
         </div>
         <p class="reason" id="audit-reason">--</p>
+        <div class="audit-warning-box">
+          <span>risk warnings</span>
+          <p id="audit-warnings">--</p>
+        </div>
+        <div class="table-wrap">
+          <table class="compact-table">
+            <thead>
+              <tr>
+                <th>check</th>
+                <th>metric</th>
+                <th>value</th>
+                <th>threshold</th>
+              </tr>
+            </thead>
+            <tbody id="audit-checks-body"></tbody>
+          </table>
+        </div>
       </section>
     </main>
 

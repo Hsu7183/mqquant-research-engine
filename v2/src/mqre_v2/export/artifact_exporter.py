@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from mqre_v2.decision.artifact_decision import build_decision_audit
 from mqre_v2.export.serializers import format_datetime, write_csv, write_json
 
 
@@ -46,7 +47,13 @@ def export_latest_run(result: dict, output_dir: str = "runs/latest") -> list[str
     wfo_summary = _normalize_wfo_summary(source.get("wfo_summary"))
     risk_report = _normalize_risk_report(source.get("risk_report"))
     forward_log = _normalize_forward_log(source.get("forward_log"), ranking)
-    decision_audit = _normalize_decision_audit(source.get("decision_audit"), ranking)
+    decision_audit = _normalize_decision_audit(
+        source.get("decision_audit"),
+        ranking,
+        oos_summary,
+        wfo_summary,
+        risk_report,
+    )
 
     files = [
         output / "ranking.json",
@@ -252,15 +259,40 @@ def _normalize_forward_log(raw: Any, ranking: list[dict[str, Any]]) -> list[dict
     return normalized
 
 
-def _normalize_decision_audit(raw: Any, ranking: list[dict[str, Any]]) -> dict[str, Any]:
+def _normalize_decision_audit(
+    raw: Any,
+    ranking: list[dict[str, Any]],
+    oos_summary: dict[str, Any],
+    wfo_summary: dict[str, Any],
+    risk_report: dict[str, Any],
+) -> dict[str, Any]:
+    generated = build_decision_audit(ranking, oos_summary, wfo_summary, risk_report)
     item = raw if isinstance(raw, dict) else {}
-    return {
-        "baseline_strategy": str(item.get("baseline_strategy") or "1001plus_baseline"),
-        "challenger_strategy": str(item.get("challenger_strategy") or ranking[0]["strategy_id"]),
-        "promotion_decision": str(item.get("promotion_decision") or "review_required"),
-        "reason": str(item.get("reason") or "artifact exporter produced a dashboard-readable review record"),
-        "timestamp": format_datetime(item.get("timestamp") or datetime(2026, 5, 7, 9, 0, 0)),
-    }
+    if not item:
+        return generated
+
+    merged = dict(generated)
+    for key in [
+        "baseline_strategy",
+        "challenger_strategy",
+        "promotion_decision",
+        "reason",
+        "timestamp",
+        "recommend_promote",
+        "requires_human_review",
+        "score",
+        "risk_warnings",
+        "checks",
+    ]:
+        if key in item:
+            merged[key] = item[key]
+
+    merged["baseline_strategy"] = str(merged.get("baseline_strategy") or "1001plus_baseline")
+    merged["challenger_strategy"] = str(merged.get("challenger_strategy") or ranking[0]["strategy_id"])
+    merged["promotion_decision"] = str(merged.get("promotion_decision") or "review_required")
+    merged["reason"] = str(merged.get("reason") or generated["reason"])
+    merged["timestamp"] = format_datetime(merged.get("timestamp") or datetime(2026, 5, 7, 9, 0, 0))
+    return merged
 
 
 def _mock_ranking() -> list[dict[str, Any]]:

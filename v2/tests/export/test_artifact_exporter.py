@@ -72,6 +72,12 @@ def test_export_latest_run_maps_partial_pipeline_result(tmp_path) -> None:
     assert ranking[0]["profit_factor"] == 1.8
     assert ranking[0]["wfo_pass_rate"] == 0.75
 
+    audit = json.loads((output / "decision_audit.json").read_text(encoding="utf-8"))
+    assert audit["challenger_strategy"] == "alpha"
+    assert "recommend_promote" in audit
+    assert "checks" in audit
+    assert audit["checks"]["ranking"]["score"] == 88.0
+
     with (output / "trades.csv").open(encoding="utf-8", newline="") as handle:
         trades = list(csv.DictReader(handle))
     assert trades[0]["datetime"] == "2024-01-01 09:05:00"
