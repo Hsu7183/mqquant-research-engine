@@ -1,5 +1,6 @@
 """Input/output helpers for mqre v2."""
 
+from mqre_v2.io.m1_parser import parse_m1_txt
 from mqre_v2.io.txt_parser import (
     parse_trade_txt,
     parse_trade_txt_file,
@@ -10,6 +11,7 @@ from mqre_v2.io.txt_parser import (
 )
 
 __all__ = [
+    "parse_m1_txt",
     "parse_trade_txt",
     "parse_trade_txt_file",
     "parse_xs_txt",
