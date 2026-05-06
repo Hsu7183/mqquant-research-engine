@@ -89,3 +89,34 @@ M1 行情
 - 口數 `qty = 1`
 
 1 分 K 短線策略若不納入滑點、手續費與期交稅，績效會嚴重高估。因此所有 generated strategy 都必須經過成本壓力測試，觀察 2、3、4、5 點單邊滑點情境下是否仍具備正淨利與合理 PF。
+
+## 效能建議
+
+策略搜尋支援多核心 parallel backtest、進度 log 與快速資料切片。
+
+常用指令：
+
+```powershell
+# debug
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 5 --workers 1 --sample-bars 50000 --start-date 2020-01-01 --end-date 2026-12-31
+
+# 小測
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 20 --workers 2 --start-date 2020-01-01 --end-date 2026-12-31
+
+# 正式
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 300 --workers 0 --start-date 2020-01-01 --end-date 2026-12-31
+```
+
+參數說明：
+
+- `--workers 0`：自動使用 `cpu_count - 1`
+- `--workers 1`：單核心，適合 debug
+- `--sample-bars N`：只用最後 N 根 M1 bars 做快速測試
+- `--dry-run`：只生成策略，不跑回測、不產生 TXT
+- `--progress-every N`：每完成 N 組策略輸出一次進度
+
+若電腦卡住，可用：
+
+```powershell
+Stop-Process -Name python -Force
+```

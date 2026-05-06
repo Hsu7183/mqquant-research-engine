@@ -65,3 +65,29 @@ M1 行情資料
 - 口數：1
 
 排行榜、KPI、週損益與資產曲線皆採扣成本後績效。1 分 K 短線策略必須檢查成本壓力測試，不能只看未扣成本毛損益。
+
+## 效能建議
+
+策略搜尋支援多核心、進度 log 與快速資料切片。
+
+```powershell
+# debug
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 5 --workers 1 --sample-bars 50000 --start-date 2020-01-01 --end-date 2026-12-31
+
+# 小測
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 20 --workers 2 --start-date 2020-01-01 --end-date 2026-12-31
+
+# 正式
+python -m mqre_v2.cli.run_strategy_search --m1-path M1.txt --num-strategies 300 --workers 0 --start-date 2020-01-01 --end-date 2026-12-31
+```
+
+- `--workers 0`：自動使用 `cpu_count - 1`
+- `--sample-bars`：只取最後 N 根 M1 做快速測試
+- `--dry-run`：只檢查 generator
+- `--progress-every`：控制進度輸出頻率
+
+若電腦卡住：
+
+```powershell
+Stop-Process -Name python -Force
+```

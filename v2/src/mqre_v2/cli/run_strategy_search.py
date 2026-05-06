@@ -1,19 +1,38 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
-import sys
+import time
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from mqre_v2.backtest.costs import CostConfig, net_pnl_points_for_trade
 from mqre_v2.backtest.generated_strategy import backtest_generated_intraday_strategy
 from mqre_v2.backtest.trade_export import export_trades_to_xs_txt
+from mqre_v2.core.bars import BarRecord
 from mqre_v2.cli.run_latest_pipeline import run_latest_pipeline
 from mqre_v2.io.m1_parser import parse_m1_txt
-from mqre_v2.strategy_gen.generator import generate_intraday_futures_strategies
+from mqre_v2.strategy_gen.generator import (
+    GeneratedStrategyConfig,
+    generate_intraday_futures_strategies,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StrategySearchWorkerContext:
+    bars: list[BarRecord]
+    output_folder: str
+    cost_config: CostConfig
+    min_net_profit_per_trade: float
+    max_trades_per_day: float
+
+
+_WORKER_CONTEXT: StrategySearchWorkerContext | None = None
 
 
 def run_strategy_search(
@@ -28,48 +47,103 @@ def run_strategy_search(
     cost_config: CostConfig | None = None,
     min_net_profit_per_trade: float = 0.0,
     max_trades_per_day: float = 999999.0,
+    workers: int = 0,
+    progress_every: int = 10,
+    sample_bars: int = 0,
+    dry_run: bool = False,
+    log_fn: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     effective_cost = cost_config or CostConfig()
+    logger = log_fn or _null_logger
+    started_at = time.perf_counter()
+    resolved_workers = _resolve_workers(workers)
+
+    logger("策略搜尋啟動")
+    logger(f"讀取 M1：{m1_path}")
     bars = [
         bar
         for bar in parse_m1_txt(m1_path)
         if start_date <= bar.ts.date() <= end_date
     ]
+    if sample_bars < 0:
+        raise ValueError("sample_bars must be >= 0")
+    if sample_bars > 0:
+        bars = bars[-sample_bars:]
+        logger(f"快速測試模式：只使用最後 {sample_bars} 根 bars")
+    logger(f"M1 bars 筆數：{len(bars)}")
+
     configs = generate_intraday_futures_strategies(
         n=num_strategies,
         seed=seed,
         families=families,
     )
+    logger(f"生成策略數：{num_strategies}")
+    logger(f"使用 workers：{resolved_workers}")
 
     output_path = Path(output_folder)
+    family_counts: Counter[str] = Counter(config.family for config in configs)
+    ranking_filename = Path(ranking_output).name
+
+    if dry_run:
+        logger("策略搜尋完成")
+        return {
+            "generated_count": len(configs),
+            "completed_backtests": 0,
+            "non_empty_trade_files": 0,
+            "ranking_json": str(Path("runs") / "latest" / "reports" / ranking_filename),
+            "top_5": [],
+            "family_counts": dict(sorted(family_counts.items())),
+            "best_family": "",
+            "cost": _cost_to_dict(effective_cost),
+            "workers": resolved_workers,
+            "sample_bars": sample_bars,
+            "dry_run": True,
+            "error_count": 0,
+            "errors": [],
+        }
+
     _clear_files(output_path, "*.txt")
     _clear_files(Path("runs") / "latest" / "reports" / "details", "*.json")
 
+    worker_context = StrategySearchWorkerContext(
+        bars=bars,
+        output_folder=str(output_path),
+        cost_config=effective_cost,
+        min_net_profit_per_trade=min_net_profit_per_trade,
+        max_trades_per_day=max_trades_per_day,
+    )
     completed_backtests = 0
     non_empty_trade_files = 0
-    family_counts: Counter[str] = Counter()
     strategy_quality: dict[str, dict[str, Any]] = {}
-    for config in configs:
+    errors: list[dict[str, str]] = []
+
+    for result in _run_backtests(
+        configs=configs,
+        context=worker_context,
+        workers=resolved_workers,
+    ):
         completed_backtests += 1
-        family_counts[config.family] += 1
-        trades = backtest_generated_intraday_strategy(bars, config)
-        if not trades:
-            continue
-        strategy_quality[config.strategy_id] = _quality_for_trades(
-            trades=trades,
-            cost_config=effective_cost,
-            min_net_profit_per_trade=min_net_profit_per_trade,
-            max_trades_per_day=max_trades_per_day,
-        )
+        if result.get("error"):
+            errors.append(
+                {
+                    "strategy_id": str(result.get("strategy_id", "")),
+                    "error": str(result.get("error", "")),
+                }
+            )
+        else:
+            quality = result.get("quality")
+            if isinstance(quality, dict):
+                strategy_quality[str(result["strategy_id"])] = quality
+            if int(result.get("trades_count", 0)) > 0:
+                non_empty_trade_files += 1
 
-        export_trades_to_xs_txt(
-            trades=trades,
-            output_path=str(output_path / f"{config.strategy_id}.txt"),
-            strategy_name=config.strategy_id,
-        )
-        non_empty_trade_files += 1
+        if _should_log_progress(completed_backtests, len(configs), progress_every):
+            elapsed = time.perf_counter() - started_at
+            logger(
+                f"已完成 {completed_backtests}/{len(configs)}，"
+                f"有交易策略 {non_empty_trade_files}，耗時 {elapsed:.1f}s"
+            )
 
-    ranking_filename = Path(ranking_output).name
     pipeline_summary = (
         run_latest_pipeline(
             base_dir="runs",
@@ -88,6 +162,7 @@ def run_strategy_search(
     )
     top_5 = [_compact_ranking_row(item) for item in list(pipeline_summary.get("top_10", []))[:5]]
     best_family = _strategy_family(str(top_5[0]["strategy_name"])) if top_5 else ""
+    logger("策略搜尋完成")
 
     return {
         "generated_count": len(configs),
@@ -98,6 +173,11 @@ def run_strategy_search(
         "family_counts": dict(sorted(family_counts.items())),
         "best_family": best_family,
         "cost": _cost_to_dict(effective_cost),
+        "workers": resolved_workers,
+        "sample_bars": sample_bars,
+        "dry_run": False,
+        "error_count": len(errors),
+        "errors": errors,
     }
 
 
@@ -121,9 +201,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         min_net_profit_per_trade=args.min_net_profit_per_trade,
         max_trades_per_day=args.max_trades_per_day,
+        workers=args.workers,
+        progress_every=args.progress_every,
+        sample_bars=args.sample_bars,
+        dry_run=args.dry_run,
+        log_fn=_stdout_logger,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2, allow_nan=False))
-    print(_build_chinese_summary(summary), file=sys.stderr)
+    print(_build_chinese_summary(summary), flush=True)
     return 0
 
 
@@ -144,6 +229,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--qty", type=int, default=1)
     parser.add_argument("--min-net-profit-per-trade", type=float, default=0.0)
     parser.add_argument("--max-trades-per-day", type=float, default=999999.0)
+    parser.add_argument("--workers", type=int, default=0)
+    parser.add_argument("--progress-every", type=int, default=10)
+    parser.add_argument("--sample-bars", type=int, default=0)
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -164,6 +253,113 @@ def _clear_files(folder: Path, pattern: str) -> None:
     for path in folder.glob(pattern):
         if path.is_file():
             path.unlink()
+
+
+def _run_backtests(
+    configs: list[GeneratedStrategyConfig],
+    context: StrategySearchWorkerContext,
+    workers: int,
+):
+    if workers <= 1:
+        _init_strategy_search_worker(context)
+        for config in configs:
+            yield _backtest_one_strategy_worker(config)
+        return
+
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=_init_strategy_search_worker,
+        initargs=(context,),
+    ) as executor:
+        futures = {
+            executor.submit(_backtest_one_strategy_worker, config): config
+            for config in configs
+        }
+        for future in as_completed(futures):
+            config = futures[future]
+            try:
+                yield future.result()
+            except Exception as exc:
+                yield {
+                    "strategy_id": config.strategy_id,
+                    "trades_count": 0,
+                    "txt_path": None,
+                    "quality": {},
+                    "error": str(exc),
+                }
+
+
+def _init_strategy_search_worker(context: StrategySearchWorkerContext) -> None:
+    global _WORKER_CONTEXT
+    _WORKER_CONTEXT = context
+
+
+def _backtest_one_strategy_worker(config: GeneratedStrategyConfig) -> dict[str, Any]:
+    if _WORKER_CONTEXT is None:
+        return {
+            "strategy_id": config.strategy_id,
+            "trades_count": 0,
+            "txt_path": None,
+            "quality": {},
+            "error": "worker context is not initialized",
+        }
+
+    try:
+        trades = backtest_generated_intraday_strategy(_WORKER_CONTEXT.bars, config)
+        txt_path = None
+        quality: dict[str, Any] = {}
+        if trades:
+            quality = _quality_for_trades(
+                trades=trades,
+                cost_config=_WORKER_CONTEXT.cost_config,
+                min_net_profit_per_trade=_WORKER_CONTEXT.min_net_profit_per_trade,
+                max_trades_per_day=_WORKER_CONTEXT.max_trades_per_day,
+            )
+            output_path = Path(_WORKER_CONTEXT.output_folder) / f"{config.strategy_id}.txt"
+            export_trades_to_xs_txt(
+                trades=trades,
+                output_path=str(output_path),
+                strategy_name=config.strategy_id,
+            )
+            txt_path = str(output_path)
+
+        return {
+            "strategy_id": config.strategy_id,
+            "trades_count": len(trades),
+            "txt_path": txt_path,
+            "quality": quality,
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "strategy_id": config.strategy_id,
+            "trades_count": 0,
+            "txt_path": None,
+            "quality": {},
+            "error": str(exc),
+        }
+
+
+def _resolve_workers(workers: int) -> int:
+    if workers < 0:
+        raise ValueError("workers must be >= 0")
+    if workers == 0:
+        return max(1, (os.cpu_count() or 1) - 1)
+    return workers
+
+
+def _should_log_progress(done: int, total: int, progress_every: int) -> bool:
+    if done == total:
+        return True
+    return progress_every > 0 and done % progress_every == 0
+
+
+def _stdout_logger(message: str) -> None:
+    print(message, flush=True)
+
+
+def _null_logger(message: str) -> None:
+    _ = message
 
 
 def _strategy_family(strategy_name: str) -> str:

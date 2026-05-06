@@ -9,6 +9,8 @@ python -m mqre_v2.cli.run_strategy_search `
   --seed 42 `
   --start-date 2020-01-01 `
   --end-date 2026-12-31 `
+  --workers 0 `
+  --progress-every 10 `
   --slippage-points 2 `
   --fee-money 0 `
   --tax-rate 0.00002 `
