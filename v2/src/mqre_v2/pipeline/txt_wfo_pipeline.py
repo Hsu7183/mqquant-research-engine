@@ -38,6 +38,7 @@ def run_txt_wfo_pipeline(
     end_date: date,
     gate_config: dict,
     txt_filenames: list[str] | None = None,
+    include_wfo_details: bool = False,
 ) -> list[dict]:
     folder = Path(txt_folder)
     if not folder.is_dir():
@@ -81,12 +82,45 @@ def run_txt_wfo_pipeline(
                 "passed": wfo_result.passed,
                 "fail_reason": wfo_result.fail_reason,
             }
+            if include_wfo_details:
+                result["summary"] = {
+                    "total_rounds": summary.total_rounds,
+                    "passed_rounds": summary.passed_rounds,
+                    "failed_rounds": summary.failed_rounds,
+                    "pass_rate": _safe_number(summary.pass_rate),
+                    "total_test_net_profit": _safe_number(
+                        summary.total_test_net_profit
+                    ),
+                    "average_test_net_profit": _safe_number(
+                        summary.average_test_net_profit
+                    ),
+                    "max_test_mdd": _safe_number(summary.max_test_mdd),
+                    "average_test_pf": _safe_number(summary.average_test_pf),
+                    "total_test_trade_count": summary.total_test_trade_count,
+                }
+                result["round_results"] = [
+                    {
+                        "round_id": round_result.round_id,
+                        "test_net_profit": _safe_number(
+                            round_result.test_net_profit
+                        ),
+                        "test_mdd": _safe_number(round_result.test_mdd),
+                        "test_pf": _safe_number(round_result.test_pf),
+                        "test_trade_count": round_result.test_trade_count,
+                        "pass_flag": round_result.pass_flag,
+                        "fail_reason": round_result.fail_reason,
+                    }
+                    for round_result in wfo_result.round_results
+                ]
         except Exception as exc:
             result = _failed_result(
                 strategy_name=strategy_name,
                 txt_path=txt_path,
                 fail_reason=str(exc),
             )
+            if include_wfo_details:
+                result["summary"] = {}
+                result["round_results"] = []
 
         results.append(result)
 

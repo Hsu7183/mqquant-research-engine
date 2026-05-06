@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import json
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
@@ -39,10 +40,12 @@ def run_pipeline_from_run(
         end_date=end_date,
         gate_config={},
         txt_filenames=validation.valid_txt,
+        include_wfo_details=True,
     )
 
     output_path = root / "reports" / output_filename
     report_rows = [_to_report_row(item) for item in ranking]
+    _write_strategy_detail_reports(root, manifest.run_id, ranking)
     export_json_report(
         _build_report_payload(manifest.run_id, report_rows),
         str(output_path),
@@ -86,6 +89,58 @@ def _to_report_row(item: dict) -> dict:
         "pass_rate": _as_float(item["pass_rate"]),
         "max_test_mdd": _as_float(item["max_test_mdd"]),
         "average_test_pf": _as_float(item["average_test_pf"]),
+    }
+
+
+def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict]) -> None:
+    details_dir = root / "reports" / "details"
+    details_dir.mkdir(parents=True, exist_ok=True)
+
+    for item in ranking:
+        payload = _build_strategy_detail_payload(run_id, item)
+        detail_path = details_dir / f"{payload['strategy_name']}.json"
+        detail_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+            encoding="utf-8",
+        )
+
+
+def _build_strategy_detail_payload(run_id: str, item: dict) -> dict:
+    period_pnl = []
+    equity_curve = []
+    equity = 0.0
+
+    for index, round_result in enumerate(item.get("round_results", []), start=1):
+        pnl = _as_float(round_result.get("test_net_profit", 0.0))
+        equity += pnl
+        period_pnl.append({"index": index, "pnl": pnl})
+        equity_curve.append({"index": index, "equity": equity})
+
+    score = _as_float(item["score"])
+    total_profit = _as_float(item["total_test_net_profit"])
+    pass_rate = _as_float(item["pass_rate"])
+    max_mdd = _as_float(item["max_test_mdd"])
+    average_pf = _as_float(item["average_test_pf"])
+
+    return {
+        "strategy_name": str(item["strategy_name"]),
+        "run_id": run_id,
+        "summary": {
+            "score": score,
+            "total_test_net_profit": total_profit,
+            "pass_rate": pass_rate,
+            "max_test_mdd": max_mdd,
+            "average_test_pf": average_pf,
+        },
+        "equity_curve": equity_curve,
+        "period_pnl": period_pnl,
+        "kpi": {
+            "score": score,
+            "profit": total_profit,
+            "pass_rate": pass_rate,
+            "mdd": max_mdd,
+            "pf": average_pf,
+        },
     }
 
 

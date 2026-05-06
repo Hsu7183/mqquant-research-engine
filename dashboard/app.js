@@ -8,6 +8,9 @@ const LATEST_REPORT_PATH = "runs/latest/reports/ranking.json";
 const GITHUB_REPORT_URL =
   `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${BRANCH}/${LATEST_REPORT_PATH}`;
 const LOCAL_REPORT_URL = "sample_ranking.json";
+const GITHUB_DETAILS_BASE_URL =
+  `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${BRANCH}/runs/latest/reports/details`;
+const LOCAL_DETAILS_BASE_URL = "../runs/latest/reports/details";
 
 const fallbackReport = {
   run_id: "20260506_sample_batch001",
@@ -35,7 +38,8 @@ let currentReport = null;
 let currentSource = { dataSource: "", sourceUrl: "" };
 let scoreChart = null;
 let profitChart = null;
-let detailChart = null;
+let detailEquityChart = null;
+let detailPeriodChart = null;
 let devtoolsTriggered = false;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -337,7 +341,7 @@ function renderCharts(rows) {
   );
 }
 
-function renderStrategyDetail(strategyName) {
+async function renderStrategyDetail(strategyName) {
   if (!currentReport) {
     return;
   }
@@ -348,22 +352,72 @@ function renderStrategyDetail(strategyName) {
     return;
   }
 
+  const detail = await loadStrategyDetail(strategyName).catch((error) => {
+    console.warn("Strategy detail JSON failed to load; falling back to ranking row.", error);
+    return null;
+  });
+  const source = detail || buildDetailFromRankingRow(row);
+  const summary = source.summary;
+  const kpi = source.kpi;
+
   showView("detail");
-  document.getElementById("detail-strategy-name").textContent = row.strategy_name;
-  document.getElementById("detail-score").textContent = formatNumber(row.score);
-  document.getElementById("detail-profit").textContent = formatMoney(row.total_test_net_profit);
-  document.getElementById("detail-pass-rate").textContent = formatPercent(row.pass_rate);
-  document.getElementById("detail-mdd").textContent = formatMoney(row.max_test_mdd);
-  document.getElementById("detail-pf").textContent = formatNumber(row.average_test_pf);
-  document.getElementById("detail-run-id").textContent = currentReport.run_id;
+  document.getElementById("detail-strategy-name").textContent = source.strategy_name;
+  document.getElementById("detail-score").textContent = formatNumber(kpi.score);
+  document.getElementById("detail-profit").textContent = formatMoney(kpi.profit);
+  document.getElementById("detail-pass-rate").textContent = formatPercent(kpi.pass_rate);
+  document.getElementById("detail-mdd").textContent = formatMoney(kpi.mdd);
+  document.getElementById("detail-pf").textContent = formatNumber(kpi.pf);
+  document.getElementById("detail-run-id").textContent = source.run_id || currentReport.run_id;
   document.getElementById("detail-generated-at").textContent = formatDateTime(
     currentReport.generated_at,
   );
   document.getElementById("detail-rank").textContent = `#${row.rank}`;
 
-  renderDetailKpis(row);
-  renderDetailChart(row);
+  renderDetailKpis({
+    rank: row.rank,
+    score: summary.score,
+    total_test_net_profit: summary.total_test_net_profit,
+    pass_rate: summary.pass_rate,
+    max_test_mdd: summary.max_test_mdd,
+    average_test_pf: summary.average_test_pf,
+  });
+  renderDetailCharts(source, row);
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function loadStrategyDetail(strategyName) {
+  const filename = `${encodeURIComponent(strategyName)}.json`;
+  const githubUrl = `${GITHUB_DETAILS_BASE_URL}/${filename}`;
+  try {
+    return await loadReport(githubUrl);
+  } catch (githubError) {
+    console.warn("GitHub strategy detail failed; trying local detail JSON.", githubError);
+    return loadReport(`${LOCAL_DETAILS_BASE_URL}/${filename}`);
+  }
+}
+
+function buildDetailFromRankingRow(row) {
+  const profit = Number(row.total_test_net_profit) || 0;
+  return {
+    strategy_name: row.strategy_name,
+    run_id: currentReport.run_id,
+    summary: {
+      score: Number(row.score) || 0,
+      total_test_net_profit: profit,
+      pass_rate: Number(row.pass_rate) || 0,
+      max_test_mdd: Number(row.max_test_mdd) || 0,
+      average_test_pf: Number(row.average_test_pf) || 0,
+    },
+    equity_curve: [],
+    period_pnl: [],
+    kpi: {
+      score: Number(row.score) || 0,
+      profit,
+      pass_rate: Number(row.pass_rate) || 0,
+      mdd: Number(row.max_test_mdd) || 0,
+      pf: Number(row.average_test_pf) || 0,
+    },
+  };
 }
 
 function findStrategyRow(strategyName) {
@@ -434,25 +488,94 @@ function appendTextCell(row, value) {
   return cell;
 }
 
-function renderDetailChart(row) {
+function renderDetailCharts(detail, rankingRow) {
   if (!window.Chart) {
     return;
   }
 
-  const top10 = currentReport.top_10.slice(0, 10);
-  const labels = top10.map((item) => `#${item.rank}`);
-  const scoreColors = top10.map((item) =>
-    item.strategy_name === row.strategy_name ? "#d32f2f" : "#93c5fd",
-  );
-  const profitColors = top10.map((item) =>
-    item.strategy_name === row.strategy_name ? "#10b981" : "#bbf7d0",
-  );
+  const hasDetailSeries =
+    Array.isArray(detail.equity_curve) &&
+    detail.equity_curve.length > 0 &&
+    Array.isArray(detail.period_pnl) &&
+    detail.period_pnl.length > 0;
 
-  if (detailChart) {
-    detailChart.destroy();
+  if (hasDetailSeries) {
+    document.getElementById("detail-equity-title").textContent = "資產曲線";
+    document.getElementById("detail-period-title").textContent = "每期損益";
+    renderEquityCurve(detail.equity_curve);
+    renderPeriodPnl(detail.period_pnl);
+    return;
   }
 
-  detailChart = new Chart(document.getElementById("detail-chart"), {
+  document.getElementById("detail-equity-title").textContent =
+    "策略分數相對排行（detail JSON 未提供）";
+  document.getElementById("detail-period-title").textContent =
+    "策略淨利相對排行（detail JSON 未提供）";
+  renderRankingFallbackCharts(rankingRow);
+}
+
+function renderEquityCurve(equityCurve) {
+  if (detailEquityChart) {
+    detailEquityChart.destroy();
+  }
+
+  detailEquityChart = new Chart(document.getElementById("detail-equity-chart"), {
+    type: "line",
+    data: {
+      labels: equityCurve.map((item) => `#${item.index}`),
+      datasets: [
+        {
+          label: "資產曲線",
+          data: equityCurve.map((item) => item.equity),
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.12)",
+          fill: true,
+          tension: 0.25,
+          pointRadius: 3,
+        },
+      ],
+    },
+    options: detailChartOptions("累積損益"),
+  });
+}
+
+function renderPeriodPnl(periodPnl) {
+  if (detailPeriodChart) {
+    detailPeriodChart.destroy();
+  }
+
+  detailPeriodChart = new Chart(document.getElementById("detail-period-chart"), {
+    type: "bar",
+    data: {
+      labels: periodPnl.map((item) => `#${item.index}`),
+      datasets: [
+        {
+          label: "每期損益",
+          data: periodPnl.map((item) => item.pnl),
+          backgroundColor: periodPnl.map((item) =>
+            item.pnl >= 0 ? "#10b981" : "#d32f2f",
+          ),
+          borderRadius: 6,
+          maxBarThickness: 38,
+        },
+      ],
+    },
+    options: detailChartOptions("損益"),
+  });
+}
+
+function renderRankingFallbackCharts(row) {
+  const top10 = currentReport.top_10.slice(0, 10);
+  const labels = top10.map((item) => `#${item.rank}`);
+
+  if (detailEquityChart) {
+    detailEquityChart.destroy();
+  }
+  if (detailPeriodChart) {
+    detailPeriodChart.destroy();
+  }
+
+  detailEquityChart = new Chart(document.getElementById("detail-equity-chart"), {
     type: "bar",
     data: {
       labels,
@@ -460,46 +583,55 @@ function renderDetailChart(row) {
         {
           label: "分數",
           data: top10.map((item) => item.score),
-          backgroundColor: scoreColors,
+          backgroundColor: top10.map((item) =>
+            item.strategy_name === row.strategy_name ? "#d32f2f" : "#93c5fd",
+          ),
           borderRadius: 6,
           maxBarThickness: 34,
-          yAxisID: "score",
-        },
-        {
-          label: "總獲利",
-          data: top10.map((item) => item.total_test_net_profit),
-          backgroundColor: profitColors,
-          borderRadius: 6,
-          maxBarThickness: 34,
-          yAxisID: "profit",
         },
       ],
     },
-    options: {
-      maintainAspectRatio: false,
-      responsive: true,
-      plugins: {
-        legend: { position: "bottom" },
+    options: detailChartOptions("分數"),
+  });
+
+  detailPeriodChart = new Chart(document.getElementById("detail-period-chart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "總獲利",
+          data: top10.map((item) => item.total_test_net_profit),
+          backgroundColor: top10.map((item) =>
+            item.strategy_name === row.strategy_name ? "#10b981" : "#bbf7d0",
+          ),
+          borderRadius: 6,
+          maxBarThickness: 34,
+        },
+      ],
+    },
+    options: detailChartOptions("總獲利"),
+  });
+}
+
+function detailChartOptions(yTitle) {
+  return {
+    maintainAspectRatio: false,
+    responsive: true,
+    plugins: {
+      legend: { position: "bottom" },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
       },
-      scales: {
-        x: {
-          grid: { display: false },
-        },
-        score: {
-          beginAtZero: true,
-          position: "left",
-          title: { display: true, text: "分數" },
-          grid: { color: "#eef2f7" },
-        },
-        profit: {
-          beginAtZero: true,
-          position: "right",
-          title: { display: true, text: "總獲利" },
-          grid: { drawOnChartArea: false },
-        },
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: yTitle },
+        grid: { color: "#eef2f7" },
       },
     },
-  });
+  };
 }
 
 function renderBarChart(canvasId, labels, values, label, color, existingChart) {
