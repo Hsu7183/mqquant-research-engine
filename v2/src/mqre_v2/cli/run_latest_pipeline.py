@@ -6,7 +6,12 @@ from datetime import date
 from pathlib import Path
 from typing import Sequence
 
+from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
+from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_pipeline import (
+    _build_report_payload,
+    _to_report_row,
+    _write_strategy_detail_reports,
     run_pipeline_from_run,
     write_ranking_summary_detail_reports,
 )
@@ -35,6 +40,45 @@ def main(argv: Sequence[str] | None = None) -> None:
     run_path = get_latest_run(args.base_dir)
     manifest_path = Path(run_path) / "manifest.json"
     if not manifest_path.is_file():
+        txt_dir = Path(run_path) / "txt"
+        if txt_dir.is_dir() and any(txt_dir.glob("*.txt")):
+            ranking = run_txt_wfo_pipeline(
+                txt_folder=str(txt_dir),
+                start_date=date.fromisoformat(args.start_date),
+                end_date=date.fromisoformat(args.end_date),
+                gate_config={},
+                include_wfo_details=True,
+            )
+            ranking_path = Path(run_path) / "reports" / args.output_filename
+            report_rows = [_to_report_row(item) for item in ranking]
+            detail_paths = _write_strategy_detail_reports(
+                Path(run_path),
+                Path(run_path).name,
+                ranking,
+            )
+            export_json_report(
+                _build_report_payload(Path(run_path).name, report_rows),
+                str(ranking_path),
+            )
+            print(
+                json.dumps(
+                    {
+                        "run_id": Path(run_path).name,
+                        "run_path": run_path,
+                        "total_strategies": len(ranking),
+                        "valid_txt": len(ranking),
+                        "output_json_path": str(ranking_path),
+                        "detail_json_count": len(detail_paths),
+                        "details_generated_from": "txt",
+                        "top_10": ranking[:10],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                    allow_nan=False,
+                )
+            )
+            return
+
         ranking_path = Path(run_path) / "reports" / args.output_filename
         if not ranking_path.is_file():
             raise FileNotFoundError(

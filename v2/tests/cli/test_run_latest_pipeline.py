@@ -133,6 +133,36 @@ def test_main_generates_detail_json_from_report_only_latest(tmp_path, capsys) ->
     assert detail["weekly_pnl"] == []
 
 
+def test_main_runs_txt_pipeline_for_latest_without_manifest(tmp_path, capsys) -> None:
+    base_dir = tmp_path / "runs"
+    txt_dir = base_dir / "latest" / "txt"
+    txt_dir.mkdir(parents=True)
+    _write_txt(str(base_dir / "latest"), "auto_demo")
+
+    main(
+        [
+            "--base-dir",
+            str(base_dir),
+            "--start-date",
+            date(2020, 1, 1).isoformat(),
+            "--end-date",
+            date(2024, 12, 31).isoformat(),
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    ranking_path = base_dir / "latest" / "reports" / "ranking.json"
+    detail_path = base_dir / "latest" / "reports" / "details" / "auto_demo.json"
+    detail = json.loads(detail_path.read_text(encoding="utf-8"))
+    assert payload["details_generated_from"] == "txt"
+    assert payload["total_strategies"] == 1
+    assert payload["valid_txt"] == 1
+    assert ranking_path.is_file()
+    assert detail_path.is_file()
+    assert detail["strategy_name"] == "auto_demo"
+    assert detail["weekly_pnl"]
+
+
 def test_main_raises_without_runs(tmp_path) -> None:
     base_dir = tmp_path / "runs"
     base_dir.mkdir()

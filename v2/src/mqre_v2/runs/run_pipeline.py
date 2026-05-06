@@ -160,10 +160,11 @@ def _build_ranking_summary_detail_payload(run_id: str, item: dict) -> dict:
     }
 
 
-def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict]) -> None:
+def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict]) -> list[str]:
     details_dir = root / "reports" / "details"
     details_dir.mkdir(parents=True, exist_ok=True)
 
+    written_paths: list[str] = []
     for item in ranking:
         trades = parse_xs_txt(
             Path(str(item["txt_path"])).read_text(encoding="utf-8-sig")
@@ -185,6 +186,9 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
             ),
             encoding="utf-8",
         )
+        written_paths.append(str(detail_path))
+
+    return written_paths
 
 
 def build_weekly_series(trades: list[TradeRecord]) -> dict:
