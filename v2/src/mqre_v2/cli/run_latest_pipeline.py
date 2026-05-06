@@ -6,7 +6,10 @@ from datetime import date
 from pathlib import Path
 from typing import Sequence
 
-from mqre_v2.runs.run_pipeline import run_pipeline_from_run
+from mqre_v2.runs.run_pipeline import (
+    run_pipeline_from_run,
+    write_ranking_summary_detail_reports,
+)
 
 
 def get_latest_run(base_dir: str) -> str:
@@ -30,6 +33,35 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     run_path = get_latest_run(args.base_dir)
+    manifest_path = Path(run_path) / "manifest.json"
+    if not manifest_path.is_file():
+        ranking_path = Path(run_path) / "reports" / args.output_filename
+        if not ranking_path.is_file():
+            raise FileNotFoundError(
+                f"latest run has no manifest and no ranking report: {run_path}"
+            )
+
+        detail_paths = write_ranking_summary_detail_reports(str(ranking_path))
+        report = json.loads(ranking_path.read_text(encoding="utf-8"))
+        print(
+            json.dumps(
+                {
+                    "run_id": report.get("run_id", Path(run_path).name),
+                    "run_path": run_path,
+                    "total_strategies": len(report.get("all_results", [])),
+                    "valid_txt": 0,
+                    "output_json_path": str(ranking_path),
+                    "detail_json_count": len(detail_paths),
+                    "details_generated_from": "ranking_summary",
+                    "top_10": report.get("top_10", []),
+                },
+                ensure_ascii=False,
+                indent=2,
+                allow_nan=False,
+            )
+        )
+        return
+
     result = run_pipeline_from_run(
         run_path=run_path,
         start_date=date.fromisoformat(args.start_date),

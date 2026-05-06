@@ -1,0 +1,26 @@
+{
+  "strategy_name": "0313plus_EB2_DB2_ATRS2_ATRTP2p5_TS30_IDX11",
+  "run_id": "latest",
+  "detail_source": "ranking_summary",
+  "summary": {
+    "score": 88.41,
+    "total_test_net_profit": 113200.0,
+    "pass_rate": 0.72,
+    "max_test_mdd": 8200.0,
+    "average_test_pf": 1.61
+  },
+  "period": {
+    "start": "",
+    "end": ""
+  },
+  "equity_curve": [],
+  "weekly_pnl": [],
+  "period_pnl": [],
+  "kpi": {
+    "score": 88.41,
+    "profit": 113200.0,
+    "pass_rate": 0.72,
+    "mdd": 8200.0,
+    "pf": 1.61
+  }
+}

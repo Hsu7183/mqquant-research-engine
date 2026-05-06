@@ -78,6 +78,61 @@ def test_main_runs_pipeline_and_outputs_json(tmp_path, capsys) -> None:
     assert Path(payload["output_json_path"]).is_file()
 
 
+def test_main_generates_detail_json_from_report_only_latest(tmp_path, capsys) -> None:
+    base_dir = tmp_path / "runs"
+    report_dir = base_dir / "latest" / "reports"
+    report_dir.mkdir(parents=True)
+    ranking_path = report_dir / "ranking.json"
+    ranking_path.write_text(
+        json.dumps(
+            {
+                "run_id": "latest",
+                "generated_at": "2026-05-06T00:00:00+00:00",
+                "summary": {
+                    "total_strategies": 1,
+                    "valid_strategies": 1,
+                },
+                "top_10": [
+                    {
+                        "rank": 1,
+                        "strategy_name": "alpha",
+                        "score": 90.0,
+                        "total_test_net_profit": 120.0,
+                        "pass_rate": 0.8,
+                        "max_test_mdd": 10.0,
+                        "average_test_pf": 1.5,
+                    }
+                ],
+                "all_results": [
+                    {
+                        "rank": 1,
+                        "strategy_name": "alpha",
+                        "score": 90.0,
+                        "total_test_net_profit": 120.0,
+                        "pass_rate": 0.8,
+                        "max_test_mdd": 10.0,
+                        "average_test_pf": 1.5,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    main(["--base-dir", str(base_dir)])
+
+    payload = json.loads(capsys.readouterr().out)
+    detail_path = report_dir / "details" / "alpha.json"
+    detail = json.loads(detail_path.read_text(encoding="utf-8"))
+    assert payload["detail_json_count"] == 1
+    assert payload["details_generated_from"] == "ranking_summary"
+    assert detail_path.is_file()
+    assert detail["strategy_name"] == "alpha"
+    assert detail["equity_curve"] == []
+    assert detail["weekly_pnl"] == []
+
+
 def test_main_raises_without_runs(tmp_path) -> None:
     base_dir = tmp_path / "runs"
     base_dir.mkdir()

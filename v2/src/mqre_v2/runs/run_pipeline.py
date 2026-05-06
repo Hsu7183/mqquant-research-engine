@@ -85,6 +85,34 @@ def _build_report_payload(run_id: str, ranking: list[dict]) -> dict:
     }
 
 
+def write_ranking_summary_detail_reports(ranking_report_path: str) -> list[str]:
+    source = Path(ranking_report_path)
+    with source.open("r", encoding="utf-8") as handle:
+        report = json.load(handle)
+
+    run_id = str(report.get("run_id", source.parent.parent.name))
+    ranking = report.get("all_results") or report.get("top_10") or []
+    details_dir = source.parent / "details"
+    details_dir.mkdir(parents=True, exist_ok=True)
+
+    written_paths: list[str] = []
+    for item in ranking:
+        payload = _build_ranking_summary_detail_payload(run_id, item)
+        detail_path = details_dir / f"{payload['strategy_name']}.json"
+        detail_path.write_text(
+            json.dumps(
+                _json_safe(payload),
+                ensure_ascii=False,
+                indent=2,
+                allow_nan=False,
+            ),
+            encoding="utf-8",
+        )
+        written_paths.append(str(detail_path))
+
+    return written_paths
+
+
 def _to_report_row(item: dict) -> dict:
     return {
         "rank": int(item["rank"]),
@@ -94,6 +122,41 @@ def _to_report_row(item: dict) -> dict:
         "pass_rate": _as_float(item["pass_rate"]),
         "max_test_mdd": _as_float(item["max_test_mdd"]),
         "average_test_pf": _as_float(item["average_test_pf"]),
+    }
+
+
+def _build_ranking_summary_detail_payload(run_id: str, item: dict) -> dict:
+    score = _as_float(item["score"])
+    total_profit = _as_float(item["total_test_net_profit"])
+    pass_rate = _as_float(item["pass_rate"])
+    max_mdd = _as_float(item["max_test_mdd"])
+    average_pf = _as_float(item["average_test_pf"])
+
+    return {
+        "strategy_name": str(item["strategy_name"]),
+        "run_id": run_id,
+        "detail_source": "ranking_summary",
+        "summary": {
+            "score": score,
+            "total_test_net_profit": total_profit,
+            "pass_rate": pass_rate,
+            "max_test_mdd": max_mdd,
+            "average_test_pf": average_pf,
+        },
+        "period": {
+            "start": "",
+            "end": "",
+        },
+        "equity_curve": [],
+        "weekly_pnl": [],
+        "period_pnl": [],
+        "kpi": {
+            "score": score,
+            "profit": total_profit,
+            "pass_rate": pass_rate,
+            "mdd": max_mdd,
+            "pf": average_pf,
+        },
     }
 
 
