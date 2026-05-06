@@ -7,11 +7,11 @@ Date: 2026-05-06
 - version: v2 standard
 - system type: strategy governance system, not execution system
 - cleanup status: standard repository layout finalized
-- latest verified tests before cleanup: `219 passed`
+- latest verified tests before this update: `219 passed`
 
 ## Standard Layout
 
-The repository is now organized around:
+The repository is organized around:
 
 - `.github/`
 - `configs/`
@@ -37,6 +37,7 @@ Reason:
 
 - Trade TXT Parser
 - M1 OHLC TXT Parser
+- M1 Backtest MVP
 - WFO Window Generator
 - WFO Result Schema
 - WFO Pass/Fail Gate
@@ -64,6 +65,19 @@ Reason:
 - Static Dashboard
 
 ## Latest Core Flow
+
+M1 demo flow:
+
+```text
+M1 TXT
+-> BarRecord
+-> SimpleM1StrategyParams
+-> TradeRecord
+-> Trade TXT
+-> WFO / Dashboard Pipeline
+```
+
+Research governance flow:
 
 ```text
 TXT folder
@@ -94,14 +108,15 @@ TXT folder
 
 - 不接券商
 - 不接 XQ API
-- 不自動下單
-- 不做自動交易
-- promoted / active 只代表策略治理狀態，不代表啟動交易
-- promotion recommendation 仍需人工確認
+- 不下單
+- 不自動切換實盤策略
+- promoted / active strategy registry 只代表治理狀態，不代表實盤執行
+- M1 Backtest MVP 是簡化研究流程，不是正式 0313 / 1001 策略
 
 ## Next Direction
 
 1. Keep `runs/latest/reports/` updated for dashboard.
 2. Add real TXT exports into pipeline runs.
-3. Continue v2～v4 governance/reporting improvements.
-4. Keep v5 execution layer out of scope.
+3. Replace the simple M1 MVP with formal 0313 / 1001 strategy adapters when ready.
+4. Continue v2-v4 governance/reporting improvements.
+5. Keep v5 execution layer out of scope.

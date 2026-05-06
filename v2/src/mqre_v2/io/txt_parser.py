@@ -53,8 +53,17 @@ _EXTENDED_REQUIRED_COLUMNS = {
     "fee_points",
 }
 
+_ENTRY_ACTIONS = {"新買": 1, "新賣": -1}
+_EXIT_ACTIONS = {"平賣": 1, "平買": -1}
+
 
 def parse_xs_txt(text: str) -> list[TradeRecord]:
+    lines = _meaningful_lines(text)
+    if not lines:
+        raise ValueError("trade txt cannot be empty")
+    if _looks_like_action_log(lines):
+        return _parse_action_log(lines)
+
     rows = list(_parse_rows(text))
     if not rows:
         raise ValueError("trade txt cannot be empty")
@@ -115,6 +124,78 @@ def _meaningful_lines(text: str) -> list[str]:
         for line in text.splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
+
+
+def _looks_like_action_log(lines: list[str]) -> bool:
+    if lines[0].lower().startswith("strategy="):
+        return True
+    for line in lines[:3]:
+        tokens = line.split()
+        if tokens and tokens[-1] in (_ENTRY_ACTIONS | _EXIT_ACTIONS):
+            return True
+    return False
+
+
+def _parse_action_log(lines: list[str]) -> list[TradeRecord]:
+    event_lines = [
+        line
+        for line in lines
+        if not line.lower().startswith("strategy=")
+        and not line.lower().startswith("version=")
+    ]
+    if not event_lines:
+        raise ValueError("trade txt contains no trade records")
+
+    records: list[TradeRecord] = []
+    open_trade: dict[str, object] | None = None
+
+    for line in event_lines:
+        tokens = line.split()
+        if len(tokens) != 3:
+            raise ValueError(f"invalid action trade row: {line}")
+
+        timestamp_raw, price_raw, action = tokens
+        timestamp = _parse_datetime(timestamp_raw)
+        price = _parse_float(price_raw, "price")
+
+        if action in _ENTRY_ACTIONS:
+            if open_trade is not None:
+                raise ValueError("new entry encountered before previous trade exit")
+            open_trade = {
+                "entry_time": timestamp,
+                "entry_price": price,
+                "direction": _ENTRY_ACTIONS[action],
+            }
+            continue
+
+        if action in _EXIT_ACTIONS:
+            if open_trade is None:
+                raise ValueError("exit encountered without an open trade")
+            direction = int(open_trade["direction"])
+            if _EXIT_ACTIONS[action] != direction:
+                raise ValueError("exit action does not match open trade direction")
+
+            entry_price = float(open_trade["entry_price"])
+            records.append(
+                TradeRecord(
+                    entry_time=open_trade["entry_time"],  # type: ignore[arg-type]
+                    exit_time=timestamp,
+                    entry_price=entry_price,
+                    exit_price=price,
+                    direction=direction,
+                    pnl=_calculate_pure_pnl(entry_price, price, direction),
+                )
+            )
+            open_trade = None
+            continue
+
+        raise ValueError(f"invalid trade action: {action}")
+
+    if open_trade is not None:
+        raise ValueError("trade txt ended with an open trade")
+    if not records:
+        raise ValueError("trade txt contains no trade records")
+    return records
 
 
 def _detect_delimiter(header: str) -> str | None:
@@ -179,7 +260,13 @@ def _validate_columns(row: dict[str, str], required: set[str]) -> None:
 
 
 def _parse_datetime(value: str) -> datetime:
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"):
+    for fmt in (
+        "%Y%m%d%H%M%S",
+        "%Y%m%d%H%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S",
+    ):
         try:
             return datetime.strptime(value, fmt)
         except ValueError:
