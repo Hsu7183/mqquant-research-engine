@@ -31,6 +31,7 @@ mqquant-research-engine/
 - XS / TXT research pipeline
 - Trade TXT parser
 - M1 OHLC TXT parser
+- Intraday futures strategy generator
 - M1 Backtest MVP
 - L1-L4 one-click pipeline
 - WFO window generation, result schema, gates, and runner
@@ -49,7 +50,8 @@ mqquant-research-engine/
 
 ```text
 M1
--> Backtest
+-> Strategy Generator
+-> Multi-strategy Backtest
 -> Trade TXT
 -> Ranking
 -> Detail
@@ -59,7 +61,7 @@ M1
 -> Dashboard
 ```
 
-The current M1 strategy logic is `SimpleM1Strategy`, an MVP adapter used to prove the full data path. It is not the formal 0313 / 1001 / 0807 strategy logic.
+The system does not hard-code 0313 or 1001plus+. It generates multiple intraday futures strategy families and then filters them through L1-L4. `SimpleM1Strategy` remains an MVP adapter; formal 0313 / 1001 / 0807 adapters can be plugged in later.
 
 ## Launch
 

@@ -291,6 +291,7 @@ function renderTable(rows) {
     const cells = [
       item.rank,
       item.strategy_name,
+      parseStrategyFamily(item.strategy_name),
       formatNumber(item.score),
       formatMoney(item.total_test_net_profit),
       formatPercent(item.pass_rate),
@@ -314,6 +315,23 @@ function renderTable(rows) {
     tr.appendChild(detailCell);
     body.appendChild(tr);
   }
+}
+
+function parseStrategyFamily(strategyName) {
+  const families = [
+    "trend_breakout",
+    "open_range_breakout",
+    "vwap_pullback",
+    "mean_reversion_range",
+    "volume_breakout",
+    "breakdown_momentum",
+    "slow_grind_trend",
+    "afternoon_trend_extension",
+  ];
+  for (const family of families) {
+    if (strategyName.startsWith(`${family}_`)) return family;
+  }
+  return strategyName.split("_").slice(0, -1).join("_") || strategyName;
 }
 
 function renderCharts(rows) {

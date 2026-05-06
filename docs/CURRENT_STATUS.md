@@ -37,6 +37,7 @@ Reason:
 - Trade TXT Parser
 - M1 OHLC TXT Parser
 - M1 Backtest MVP
+- Intraday Futures Strategy Generator
 - L1-L4 Pipeline CLI
 - WFO Window Generator
 - WFO Result Schema
@@ -70,7 +71,8 @@ Formal L1-L4 flow:
 
 ```text
 M1
--> Backtest
+-> Strategy Generator
+-> Multi-strategy Backtest
 -> Trade TXT
 -> Ranking
 -> Detail
@@ -84,7 +86,8 @@ Detailed flow:
 
 ```text
 M1 行情資料
--> SimpleM1Strategy MVP 回測
+-> Strategy Generator
+-> 多策略回測
 -> TradeRecord / Trade TXT
 -> Run Latest Pipeline
 -> Ranking JSON
@@ -116,6 +119,8 @@ M1 行情資料
 - 不下單
 - 不自動切換實盤策略
 - promoted / active strategy registry 只代表治理狀態，不代表實盤執行
+- 系統不是固定 0313 或 1001plus+
+- 1001plus+ 只是技術元件參考
 - SimpleM1Strategy 是 MVP 策略邏輯
 - 下一步才會替換為正式 0313 / 1001 / 0807 策略邏輯
 

@@ -18,7 +18,8 @@ run_all_pipeline.cmd
 
 ```text
 M1 行情資料
--> SimpleM1Strategy MVP 回測
+-> 策略生成器
+-> 多策略回測
 -> Trade TXT
 -> Run Latest Pipeline
 -> Ranking JSON
@@ -48,5 +49,7 @@ M1 行情資料
 - 目前不接券商
 - 目前不接 XQ API
 - 不自動下單
+- 系統不是固定 0313 或 1001plus+
+- 1001plus+ 只是技術元件參考
 - SimpleM1Strategy 是 MVP 策略邏輯
 - 下一步才會替換為正式 0313 / 1001 / 0807 策略邏輯
