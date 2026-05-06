@@ -302,6 +302,12 @@ dl {
   margin: 0;
 }
 
+.forward-grid {
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
 dl div {
   align-items: center;
   display: flex;
@@ -390,6 +396,7 @@ dd {
   .chart-grid,
   .info-grid,
   .decision-grid,
+  .forward-grid,
   .job-grid,
   .job-controls {
     grid-template-columns: 1fr;

@@ -47,12 +47,14 @@ def export_latest_run(result: dict, output_dir: str = "runs/latest") -> list[str
     wfo_summary = _normalize_wfo_summary(source.get("wfo_summary"))
     risk_report = _normalize_risk_report(source.get("risk_report"))
     forward_log = _normalize_forward_log(source.get("forward_log"), ranking)
+    forward_report = _normalize_forward_report(source.get("forward_report"), forward_log, ranking)
     decision_audit = _normalize_decision_audit(
         source.get("decision_audit"),
         ranking,
         oos_summary,
         wfo_summary,
         risk_report,
+        forward_report,
     )
 
     files = [
@@ -64,6 +66,7 @@ def export_latest_run(result: dict, output_dir: str = "runs/latest") -> list[str
         output / "wfo_summary.json",
         output / "risk_report.json",
         output / "forward_log.csv",
+        output / "forward_report.json",
         output / "decision_audit.json",
     ]
 
@@ -75,7 +78,8 @@ def export_latest_run(result: dict, output_dir: str = "runs/latest") -> list[str
     write_json(files[5], wfo_summary)
     write_json(files[6], risk_report)
     write_csv(files[7], forward_log, FORWARD_FIELDS)
-    write_json(files[8], decision_audit)
+    write_json(files[8], forward_report)
+    write_json(files[9], decision_audit)
 
     return [str(path) for path in files]
 
@@ -259,14 +263,110 @@ def _normalize_forward_log(raw: Any, ranking: list[dict[str, Any]]) -> list[dict
     return normalized
 
 
+def _normalize_forward_report(
+    raw: Any,
+    forward_log: list[dict[str, Any]],
+    ranking: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if isinstance(raw, dict) and raw:
+        report = dict(raw)
+    else:
+        report = _forward_report_from_log(forward_log, ranking)
+
+    report.setdefault("strategy_id", ranking[0]["strategy_id"])
+    report.setdefault("trade_count", len(forward_log))
+    report.setdefault("total_pnl", 0.0)
+    report.setdefault("sharpe_estimate", 0.0)
+    report.setdefault("max_drawdown", 0.0)
+    report.setdefault("win_rate", 0.0)
+    report.setdefault("backtest_expected_pnl", 0.0)
+    report.setdefault("vs_backtest_diff", _as_float(report.get("total_pnl")))
+    report.setdefault("vs_backtest_ratio", 0.0)
+    report.setdefault("stability_score", 0.0)
+    report.setdefault("forward_status", "not_available")
+    report.setdefault("is_deviating", False)
+    report.setdefault("recommendation", "continue")
+    return report
+
+
+def _forward_report_from_log(
+    forward_log: list[dict[str, Any]],
+    ranking: list[dict[str, Any]],
+) -> dict[str, Any]:
+    strategy_id = ranking[0]["strategy_id"]
+    rows = [row for row in forward_log if row.get("strategy_id") == strategy_id]
+    pnl_values = [_as_float(row.get("pnl")) for row in rows]
+    total_pnl = sum(pnl_values)
+    trade_count = len(pnl_values)
+    cumulative = [_as_float(row.get("cumulative_pnl")) for row in rows]
+    max_drawdown = _max_forward_drawdown(cumulative)
+    win_rate = (
+        sum(1 for value in pnl_values if value > 0) / trade_count
+        if trade_count
+        else 0.0
+    )
+    expected = _as_float(ranking[0].get("annual_return")) * 100000.0
+    vs_ratio = total_pnl / expected if expected > 0 else 0.0
+    is_deviating = total_pnl < 0 or (expected > 0 and total_pnl < expected * 0.5)
+    stability_score = max(
+        0.0,
+        min(
+            100.0,
+            45.0
+            + (20.0 if total_pnl > 0 else -25.0)
+            + min(20.0, win_rate * 25.0)
+            + (10.0 if not is_deviating and expected > 0 else 0.0),
+        ),
+    )
+    forward_status = (
+        "good"
+        if stability_score >= 70.0 and not is_deviating
+        else "warning"
+        if stability_score >= 40.0
+        else "bad"
+    )
+
+    return {
+        "strategy_id": strategy_id,
+        "trade_count": trade_count,
+        "total_pnl": round(total_pnl, 6),
+        "sharpe_estimate": 0.0,
+        "max_drawdown": round(max_drawdown, 6),
+        "win_rate": round(win_rate, 6),
+        "backtest_expected_pnl": round(expected, 6),
+        "vs_backtest_diff": round(total_pnl - expected, 6),
+        "vs_backtest_ratio": round(vs_ratio, 6),
+        "stability_score": round(stability_score, 6),
+        "forward_status": forward_status,
+        "is_deviating": is_deviating,
+        "recommendation": "stop" if forward_status == "bad" or is_deviating else "continue",
+    }
+
+
+def _max_forward_drawdown(cumulative: list[float]) -> float:
+    peak = 0.0
+    max_drawdown = 0.0
+    for value in cumulative:
+        peak = max(peak, value)
+        max_drawdown = max(max_drawdown, peak - value)
+    return max_drawdown
+
+
 def _normalize_decision_audit(
     raw: Any,
     ranking: list[dict[str, Any]],
     oos_summary: dict[str, Any],
     wfo_summary: dict[str, Any],
     risk_report: dict[str, Any],
+    forward_report: dict[str, Any],
 ) -> dict[str, Any]:
-    generated = build_decision_audit(ranking, oos_summary, wfo_summary, risk_report)
+    generated = build_decision_audit(
+        ranking,
+        oos_summary,
+        wfo_summary,
+        risk_report,
+        forward_report=forward_report,
+    )
     item = raw if isinstance(raw, dict) else {}
     if not item:
         return generated

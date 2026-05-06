@@ -20,6 +20,7 @@ This creates:
 - `runs/latest/wfo_summary.json`
 - `runs/latest/risk_report.json`
 - `runs/latest/forward_log.csv`
+- `runs/latest/forward_report.json`
 - `runs/latest/decision_audit.json`
 
 ## 2. Start A Local Server
@@ -53,6 +54,7 @@ The promotion recommendation / decision audit engine reads these artifacts:
 - `runs/latest/oos_summary.json`
 - `runs/latest/wfo_summary.json`
 - `runs/latest/risk_report.json`
+- `runs/latest/forward_report.json` when available
 
 Generate or refresh `runs/latest/decision_audit.json`:
 
@@ -69,9 +71,45 @@ The dashboard then displays:
 - score
 - human review requirement
 - risk warnings
-- ranking / OOS / WFO / risk threshold checks
+- ranking / OOS / WFO / risk / forward threshold checks
 
-## 6. Monitor A Pipeline Job
+## 6. Forward Test Monitoring
+
+The forward monitoring layer writes live paper-tracking rows to:
+
+```text
+runs/forward/forward_log.csv
+```
+
+Each row contains:
+
+```text
+datetime,strategy_id,price,pnl,cumulative_pnl
+```
+
+Evaluate one strategy into a dashboard artifact:
+
+```python
+from mqre_v2.forward import evaluate_forward_performance
+
+evaluate_forward_performance("1001plus_0001")
+```
+
+This writes:
+
+```text
+runs/latest/forward_report.json
+```
+
+The dashboard Forward Test block reads `forward_report.json` and displays:
+
+- cumulative pnl
+- difference versus backtest expectation
+- forward status
+- deviation flag
+- recommendation: `continue` or `stop`
+
+## 7. Monitor A Pipeline Job
 
 Run the latest pipeline with progress output:
 

@@ -16,6 +16,7 @@ EXPECTED_FILES = {
     "wfo_summary.json",
     "risk_report.json",
     "forward_log.csv",
+    "forward_report.json",
     "decision_audit.json",
 }
 
@@ -77,6 +78,8 @@ def test_export_latest_run_maps_partial_pipeline_result(tmp_path) -> None:
     assert "recommend_promote" in audit
     assert "checks" in audit
     assert audit["checks"]["ranking"]["score"] == 88.0
+    assert "forward_score" in audit
+    assert "forward_report.json" in {path.name for path in output.iterdir()}
 
     with (output / "trades.csv").open(encoding="utf-8", newline="") as handle:
         trades = list(csv.DictReader(handle))

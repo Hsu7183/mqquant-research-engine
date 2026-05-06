@@ -132,8 +132,6 @@ def export_dashboard_artifacts_from_ranking(
                 or top_item.get("strategy_id")
                 or "1001plus_candidate"
             ),
-            "promotion_decision": "review_required",
-            "reason": "pipeline completed; dashboard artifacts exported for human review",
         },
     }
     if trades:

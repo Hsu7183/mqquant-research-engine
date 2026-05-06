@@ -230,20 +230,44 @@ def _build_forward_log(start: datetime, rows: int = 25) -> list[dict[str, object
     return forward_rows
 
 
+def _build_forward_report() -> dict[str, object]:
+    return {
+        "strategy_id": "1001plus_0001",
+        "trade_count": 25,
+        "total_pnl": 1488.72,
+        "sharpe_estimate": 1.08,
+        "max_drawdown": 155.0,
+        "win_rate": 0.72,
+        "backtest_expected_pnl": 20100.0,
+        "vs_backtest_diff": -18611.28,
+        "vs_backtest_ratio": 0.074066,
+        "stability_score": 58.0,
+        "forward_status": "warning",
+        "is_deviating": True,
+        "recommendation": "stop",
+    }
+
+
 def _build_decision_audit() -> dict[str, object]:
     return {
         "baseline_strategy": "1001plus_baseline",
         "challenger_strategy": "1001plus_0001",
-        "promotion_decision": "promote",
+        "promotion_decision": "watch",
         "reason": (
-            "mock challenger passed ranking, OOS, WFO, and risk thresholds; human "
-            "review is still required before promotion."
+            "mock challenger passed ranking, OOS, WFO, and risk thresholds, but "
+            "forward test is deviating from backtest expectations."
         ),
         "timestamp": _iso(datetime(2026, 5, 7, 9, 0, tzinfo=timezone.utc)),
-        "recommend_promote": True,
+        "recommend_promote": False,
         "requires_human_review": True,
         "score": 128.4,
-        "risk_warnings": [],
+        "forward_score": 58.0,
+        "forward_status": "warning",
+        "risk_warnings": [
+            "forward_score below promotion threshold",
+            "forward_status warning",
+            "forward performance deviates from backtest",
+        ],
         "checks": {
             "ranking": {
                 "score": 128.4,
@@ -277,6 +301,14 @@ def _build_decision_audit() -> dict[str, object]:
                 "recovery_days": 17,
                 "max_recovery_days": 60,
             },
+            "forward": {
+                "stability_score": 58.0,
+                "min_forward_score": 60.0,
+                "forward_status": "warning",
+                "total_pnl": 1488.72,
+                "vs_backtest_diff": -18611.28,
+                "is_deviating": True,
+            },
         },
     }
 
@@ -295,6 +327,7 @@ def generate_mock_artifacts() -> list[Path]:
         OUTPUT_DIR / "wfo_summary.json",
         OUTPUT_DIR / "risk_report.json",
         OUTPUT_DIR / "forward_log.csv",
+        OUTPUT_DIR / "forward_report.json",
         OUTPUT_DIR / "decision_audit.json",
     ]
 
@@ -318,6 +351,7 @@ def generate_mock_artifacts() -> list[Path]:
         ["datetime", "strategy_id", "pnl", "cumulative_pnl"],
         _build_forward_log(start),
     )
+    _write_json(OUTPUT_DIR / "forward_report.json", _build_forward_report())
     _write_json(OUTPUT_DIR / "decision_audit.json", _build_decision_audit())
 
     return generated_files

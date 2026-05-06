@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--oos-summary-path")
     parser.add_argument("--wfo-summary-path")
     parser.add_argument("--risk-report-path")
+    parser.add_argument("--forward-report-path")
     parser.add_argument("--output-path")
     parser.add_argument("--baseline-strategy", default="1001plus_baseline")
     parser.add_argument("--min-score", type=float, default=100.0)
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-risk-drawdown", type=float, default=15000.0)
     parser.add_argument("--max-ulcer-index", type=float, default=10.0)
     parser.add_argument("--max-recovery-days", type=int, default=60)
+    parser.add_argument("--min-forward-score", type=float, default=60.0)
     args = parser.parse_args(argv)
 
     artifact_dir = Path(args.artifact_dir)
@@ -40,6 +42,14 @@ def main(argv: list[str] | None = None) -> int:
     oos_summary_path = args.oos_summary_path or str(artifact_dir / "oos_summary.json")
     wfo_summary_path = args.wfo_summary_path or str(artifact_dir / "wfo_summary.json")
     risk_report_path = args.risk_report_path or str(artifact_dir / "risk_report.json")
+    default_forward_path = artifact_dir / "forward_report.json"
+    forward_report_path = (
+        args.forward_report_path
+        if args.forward_report_path is not None
+        else str(default_forward_path)
+        if default_forward_path.exists()
+        else None
+    )
     output_path = args.output_path or str(artifact_dir / "decision_audit.json")
 
     payload = export_decision_audit_from_artifacts(
@@ -47,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         oos_summary_path=oos_summary_path,
         wfo_summary_path=wfo_summary_path,
         risk_report_path=risk_report_path,
+        forward_report_path=forward_report_path,
         output_path=output_path,
         config=ArtifactDecisionConfig(
             baseline_strategy=args.baseline_strategy,
@@ -62,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             max_risk_drawdown=args.max_risk_drawdown,
             max_ulcer_index=args.max_ulcer_index,
             max_recovery_days=args.max_recovery_days,
+            min_forward_score=args.min_forward_score,
         ),
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))

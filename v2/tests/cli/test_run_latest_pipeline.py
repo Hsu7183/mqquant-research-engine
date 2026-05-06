@@ -130,7 +130,7 @@ def test_main_generates_detail_json_from_report_only_latest(tmp_path, capsys) ->
     detail = json.loads(detail_path.read_text(encoding="utf-8"))
     assert payload["detail_json_count"] == 1
     assert payload["details_generated_from"] == "ranking_summary"
-    assert payload["artifact_count"] == 9
+    assert payload["artifact_count"] == 10
     assert detail_path.is_file()
     assert (base_dir / "latest" / "ranking.json").is_file()
     assert (base_dir / "latest" / "strategy_detail.json").is_file()
@@ -161,7 +161,7 @@ def test_main_runs_txt_pipeline_for_latest_without_manifest(tmp_path, capsys) ->
     detail_path = base_dir / "latest" / "reports" / "details" / "auto_demo.json"
     detail = json.loads(detail_path.read_text(encoding="utf-8"))
     assert payload["details_generated_from"] == "txt"
-    assert payload["artifact_count"] == 9
+    assert payload["artifact_count"] == 10
     assert payload["total_strategies"] == 1
     assert payload["valid_txt"] == 1
     assert ranking_path.is_file()

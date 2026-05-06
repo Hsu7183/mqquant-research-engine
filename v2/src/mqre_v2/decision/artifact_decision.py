@@ -23,6 +23,7 @@ class ArtifactDecisionConfig:
     max_risk_drawdown: float = 15000.0
     max_ulcer_index: float = 10.0
     max_recovery_days: int = 60
+    min_forward_score: float = 60.0
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,8 @@ class ArtifactDecisionAudit:
     recommend_promote: bool
     requires_human_review: bool
     score: float
+    forward_score: float
+    forward_status: str
     risk_warnings: list[str]
     checks: dict[str, dict[str, Any]]
 
@@ -44,6 +47,7 @@ def build_decision_audit(
     oos_summary: dict[str, Any],
     wfo_summary: dict[str, Any],
     risk_report: dict[str, Any],
+    forward_report: dict[str, Any] | None = None,
     config: ArtifactDecisionConfig | None = None,
 ) -> dict[str, Any]:
     cfg = config or ArtifactDecisionConfig()
@@ -70,6 +74,11 @@ def build_decision_audit(
     risk_max_dd = _as_float(risk_report.get("max_dd"), ranking_mdd)
     ulcer_index = _as_float(risk_report.get("ulcer_index"))
     recovery_days = int(_as_float(risk_report.get("recovery_days")))
+    forward = forward_report if isinstance(forward_report, dict) else {}
+    forward_score = _as_float(forward.get("stability_score"))
+    forward_status = str(forward.get("forward_status") or "not_available")
+    forward_vs_diff = _as_float(forward.get("vs_backtest_diff"))
+    forward_is_deviating = bool(forward.get("is_deviating", False))
 
     warnings: list[str] = []
     critical = False
@@ -103,6 +112,15 @@ def build_decision_audit(
         warn("ulcer_index above maximum")
     if recovery_days > cfg.max_recovery_days:
         warn("recovery_days above maximum")
+    if forward:
+        if forward_score < cfg.min_forward_score:
+            warn("forward_score below promotion threshold", forward_score < cfg.min_forward_score * 0.67)
+        if forward_status == "warning":
+            warn("forward_status warning")
+        elif forward_status == "bad":
+            warn("forward_status bad", True)
+        if forward_is_deviating:
+            warn("forward performance deviates from backtest", forward_vs_diff < 0)
 
     if not warnings:
         promotion_decision = "promote"
@@ -123,6 +141,8 @@ def build_decision_audit(
         recommend_promote=promotion_decision == "promote",
         requires_human_review=True,
         score=round(score, 6),
+        forward_score=round(forward_score, 6),
+        forward_status=forward_status,
         risk_warnings=warnings,
         checks={
             "ranking": {
@@ -157,6 +177,14 @@ def build_decision_audit(
                 "recovery_days": recovery_days,
                 "max_recovery_days": cfg.max_recovery_days,
             },
+            "forward": {
+                "stability_score": round(forward_score, 6),
+                "min_forward_score": cfg.min_forward_score,
+                "forward_status": forward_status,
+                "total_pnl": round(_as_float(forward.get("total_pnl")), 6),
+                "vs_backtest_diff": round(forward_vs_diff, 6),
+                "is_deviating": forward_is_deviating,
+            },
         },
     )
     return asdict(payload)
@@ -168,13 +196,20 @@ def export_decision_audit_from_artifacts(
     wfo_summary_path: str,
     risk_report_path: str,
     output_path: str,
+    forward_report_path: str | None = None,
     config: ArtifactDecisionConfig | None = None,
 ) -> dict[str, Any]:
+    forward_report = (
+        _read_json(forward_report_path)
+        if forward_report_path is not None and Path(forward_report_path).exists()
+        else None
+    )
     payload = build_decision_audit(
         _read_json(ranking_path),
         _read_json(oos_summary_path),
         _read_json(wfo_summary_path),
         _read_json(risk_report_path),
+        forward_report=forward_report,
         config=config,
     )
     payload["source_artifacts"] = {
@@ -183,6 +218,8 @@ def export_decision_audit_from_artifacts(
         "wfo_summary": wfo_summary_path,
         "risk_report": risk_report_path,
     }
+    if forward_report_path is not None:
+        payload["source_artifacts"]["forward_report"] = forward_report_path
 
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)

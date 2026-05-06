@@ -162,7 +162,7 @@ def run_latest_pipeline(
         "total_strategies": result.total_strategies,
         "valid_txt": result.valid_txt,
         "output_json_path": result.output_json_path,
-        "artifact_count": 9,
+        "artifact_count": 10,
         "job_id": result.job_id,
         "top_10": result.ranking[:10],
     }

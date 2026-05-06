@@ -9,6 +9,7 @@ const artifacts = {
   oos: "oos_summary.json",
   wfo: "wfo_summary.json",
   risk: "risk_report.json",
+  forwardReport: "forward_report.json",
   audit: "decision_audit.json",
 };
 
@@ -33,6 +34,7 @@ async function loadDashboard() {
     oosSummary,
     wfoSummary,
     riskReport,
+    forwardReport,
     decisionAudit,
   ] = await Promise.all([
     fetchJson(artifacts.ranking),
@@ -42,6 +44,7 @@ async function loadDashboard() {
     fetchJson(artifacts.oos),
     fetchJson(artifacts.wfo),
     fetchJson(artifacts.risk),
+    fetchJsonOptional(artifacts.forwardReport),
     fetchJson(artifacts.audit),
   ]);
 
@@ -52,6 +55,7 @@ async function loadDashboard() {
   renderDrawdownChart(equityRows);
   renderTrades(tradeRows);
   renderValidationCards(oosSummary, wfoSummary, riskReport);
+  renderForwardTest(forwardReport);
   renderDecisionAudit(decisionAudit);
 }
 
@@ -69,6 +73,14 @@ async function fetchCsv(filename) {
     throw new Error(`Failed to fetch ${filename}: ${response.status}`);
   }
   return parseCsv(await response.text());
+}
+
+async function fetchJsonOptional(filename) {
+  const response = await fetch(`${ARTIFACT_BASE}/${filename}`, { cache: "no-store" });
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
 }
 
 function bindJobMonitor() {
@@ -337,6 +349,33 @@ function renderValidationCards(oos, wfo, risk) {
   ]);
 }
 
+function renderForwardTest(report) {
+  if (!report) {
+    renderDefinitionList("forward-card", [
+      ["Cumulative PnL", "--"],
+      ["vs Backtest", "--"],
+      ["Status", "missing forward_report.json"],
+      ["Recommendation", "--"],
+    ]);
+    document.getElementById("forward-warning").textContent =
+      "Forward report is not available yet.";
+    return;
+  }
+
+  const isDeviating = report.is_deviating === true;
+  renderDefinitionList("forward-card", [
+    ["Cumulative PnL", formatNumber(report.total_pnl, 2)],
+    ["vs Backtest Diff", formatNumber(report.vs_backtest_diff, 2)],
+    ["Stability Score", formatNumber(report.stability_score, 2)],
+    ["Status", report.forward_status ?? "--"],
+    ["Deviation", isDeviating ? "Yes" : "No"],
+    ["Recommendation", report.recommendation ?? "--"],
+  ]);
+  document.getElementById("forward-warning").textContent = isDeviating
+    ? "Forward performance is deviating from backtest expectations."
+    : "Forward performance is within the current monitoring threshold.";
+}
+
 function renderDefinitionList(elementId, rows) {
   const target = document.getElementById(elementId);
   target.innerHTML = rows
@@ -379,6 +418,9 @@ function renderAuditChecks(checks) {
     ["risk", "max_dd", checks.risk?.max_dd, checks.risk?.max_risk_drawdown],
     ["risk", "ulcer_index", checks.risk?.ulcer_index, checks.risk?.max_ulcer_index],
     ["risk", "recovery_days", checks.risk?.recovery_days, checks.risk?.max_recovery_days],
+    ["forward", "stability_score", checks.forward?.stability_score, checks.forward?.min_forward_score],
+    ["forward", "forward_status", checks.forward?.forward_status, "--"],
+    ["forward", "vs_backtest_diff", checks.forward?.vs_backtest_diff, "--"],
   ];
 
   rows.forEach(([group, metric, value, threshold]) => {

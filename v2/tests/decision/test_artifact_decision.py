@@ -93,6 +93,28 @@ def test_build_decision_audit_rejects_for_critical_warnings() -> None:
     assert "risk max drawdown above maximum" in audit["risk_warnings"]
 
 
+def test_build_decision_audit_rejects_when_forward_bad() -> None:
+    audit = build_decision_audit(
+        _ranking(),
+        _oos(),
+        _wfo(),
+        _risk(),
+        forward_report={
+            "stability_score": 20.0,
+            "forward_status": "bad",
+            "total_pnl": -500.0,
+            "vs_backtest_diff": -10000.0,
+            "is_deviating": True,
+        },
+    )
+
+    assert audit["promotion_decision"] == "reject"
+    assert audit["forward_score"] == 20.0
+    assert audit["forward_status"] == "bad"
+    assert "forward_status bad" in audit["risk_warnings"]
+    assert "forward performance deviates from backtest" in audit["risk_warnings"]
+
+
 def test_build_decision_audit_accepts_ranking_report_shape() -> None:
     audit = build_decision_audit(
         {"top_10": _ranking(strategy_id="alpha")},

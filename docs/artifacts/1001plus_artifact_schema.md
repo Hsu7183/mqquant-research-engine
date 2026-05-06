@@ -23,6 +23,7 @@ runs/latest/
   wfo_summary.json
   risk_report.json
   forward_log.csv
+  forward_report.json
   decision_audit.json
 ```
 
@@ -276,7 +277,57 @@ Calculation notes:
 - Promotion decisions should reference forward log data but must still require human
   review unless a later governance document explicitly changes that rule.
 
-## 10. `decision_audit.json`
+## 10. `forward_report.json`
+
+Purpose: forward test performance evaluation for one strategy.
+
+Expected shape:
+
+```json
+{
+  "strategy_id": "1001plus_0001",
+  "trade_count": 25,
+  "total_pnl": 1488.72,
+  "sharpe_estimate": 1.08,
+  "max_drawdown": 155.0,
+  "win_rate": 0.72,
+  "backtest_expected_pnl": 20100.0,
+  "vs_backtest_diff": -18611.28,
+  "vs_backtest_ratio": 0.074,
+  "stability_score": 58.0,
+  "forward_status": "warning",
+  "is_deviating": true,
+  "recommendation": "stop"
+}
+```
+
+Fields:
+
+- `strategy_id`: strategy being tracked in forward testing.
+- `trade_count`: number of forward observations or completed forward trades.
+- `total_pnl`: cumulative forward pnl.
+- `sharpe_estimate`: simple forward-period Sharpe estimate from forward pnl rows.
+- `max_drawdown`: maximum drawdown of the forward cumulative pnl curve.
+- `win_rate`: winning forward row ratio.
+- `backtest_expected_pnl`: backtest expectation used as the comparison baseline.
+- `vs_backtest_diff`: `total_pnl - backtest_expected_pnl`.
+- `vs_backtest_ratio`: `total_pnl / backtest_expected_pnl` when the expectation is
+  positive; otherwise zero.
+- `stability_score`: 0-100 forward stability score computed from forward pnl,
+  drawdown, win rate, Sharpe estimate, and backtest deviation.
+- `forward_status`: `good`, `warning`, or `bad`.
+- `is_deviating`: true when forward pnl materially underperforms backtest
+  expectation or turns negative.
+- `recommendation`: `continue` or `stop`.
+
+Calculation notes:
+
+- Forward test is a monitoring layer. It does not connect to a broker and does not
+  place orders.
+- The decision module may downgrade a promotion recommendation to `watch` or
+  `reject` when forward performance materially deteriorates.
+
+## 11. `decision_audit.json`
 
 Purpose: baseline / challenger decision and promotion audit trail.
 
@@ -292,12 +343,15 @@ Expected shape:
   "recommend_promote": true,
   "requires_human_review": true,
   "score": 128.4,
+  "forward_score": 58.0,
+  "forward_status": "warning",
   "risk_warnings": [],
   "checks": {
     "ranking": {},
     "oos": {},
     "wfo": {},
-    "risk": {}
+    "risk": {},
+    "forward": {}
   }
 }
 ```
@@ -316,15 +370,19 @@ Fields:
 - `requires_human_review`: must remain true for research governance. The system may
   recommend promotion, but it must not auto-deploy or auto-trade.
 - `score`: challenger score used for the recommendation.
+- `forward_score`: forward test stability score used for promotion gating.
+- `forward_status`: forward test status: `good`, `warning`, `bad`, or
+  `not_available`.
 - `risk_warnings`: list of failed or watch-zone checks, such as score, OOS Sharpe,
-  WFO pass rate, drawdown, ulcer index, or recovery days.
+  WFO pass rate, drawdown, ulcer index, recovery days, or forward deterioration.
 - `checks`: threshold audit object. It should include the metric values and
-  thresholds used for ranking, OOS, WFO, and risk checks.
+  thresholds used for ranking, OOS, WFO, risk, and forward checks.
 
 Calculation notes:
 
 - The pipeline or decision module produces this file from `ranking.json`,
-  `oos_summary.json`, `wfo_summary.json`, and `risk_report.json`.
+  `oos_summary.json`, `wfo_summary.json`, `risk_report.json`, and optional
+  `forward_report.json`.
 - The dashboard reads and displays it.
 - A promotion recommendation is not an automated trade or deployment action.
 
