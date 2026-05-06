@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from mqre_v2.core.trades import TradeRecord
 from mqre_v2.io.txt_parser import parse_xs_txt
@@ -104,14 +105,21 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
         trades = parse_xs_txt(
             Path(str(item["txt_path"])).read_text(encoding="utf-8-sig")
         )
+        weekly_series = build_weekly_series(trades)
         payload = _build_strategy_detail_payload(
             run_id,
             item,
-            weekly_series=build_weekly_series(trades),
+            trades=trades,
+            weekly_series=weekly_series,
         )
         detail_path = details_dir / f"{payload['strategy_name']}.json"
         detail_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+            json.dumps(
+                _json_safe(payload),
+                ensure_ascii=False,
+                indent=2,
+                allow_nan=False,
+            ),
             encoding="utf-8",
         )
 
@@ -138,9 +146,78 @@ def build_weekly_series(trades: list[TradeRecord]) -> dict:
     }
 
 
+def build_trade_period(trades: list[TradeRecord]) -> dict[str, str]:
+    if not trades:
+        return {"start": "", "end": ""}
+
+    start = min(trade.entry_time for trade in trades).date().isoformat()
+    end = max(trade.exit_time for trade in trades).date().isoformat()
+    return {"start": start, "end": end}
+
+
+def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
+    trade_count = len(trades)
+    if trade_count == 0:
+        return {
+            "trade_count": 0,
+            "long_count": 0,
+            "short_count": 0,
+            "win_count": 0,
+            "loss_count": 0,
+            "win_rate": 0.0,
+            "total_profit": 0.0,
+            "avg_trade_pnl": 0.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "largest_win": 0.0,
+            "largest_loss": 0.0,
+            "gross_profit": 0.0,
+            "gross_loss": 0.0,
+            "profit_factor": 0.0,
+            "payoff_ratio": 0.0,
+            "max_drawdown": 0.0,
+            "underwater_weeks": 0,
+            "max_losing_streak": 0,
+        }
+
+    pnls = [float(trade.pnl) for trade in trades]
+    wins = [pnl for pnl in pnls if pnl > 0]
+    losses = [pnl for pnl in pnls if pnl < 0]
+    gross_profit = sum(wins)
+    gross_loss = abs(sum(losses))
+    avg_win = gross_profit / len(wins) if wins else 0.0
+    avg_loss = gross_loss / len(losses) if losses else 0.0
+    max_drawdown, underwater_weeks = _compute_weekly_risk(
+        weekly_series.get("equity_curve", [])
+    )
+
+    return {
+        "trade_count": trade_count,
+        "long_count": sum(1 for trade in trades if trade.direction == 1),
+        "short_count": sum(1 for trade in trades if trade.direction == -1),
+        "win_count": len(wins),
+        "loss_count": len(losses),
+        "win_rate": len(wins) / trade_count,
+        "total_profit": sum(pnls),
+        "avg_trade_pnl": sum(pnls) / trade_count,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "largest_win": max(wins) if wins else 0.0,
+        "largest_loss": abs(min(losses)) if losses else 0.0,
+        "gross_profit": gross_profit,
+        "gross_loss": gross_loss,
+        "profit_factor": _ratio_or_inf(gross_profit, gross_loss),
+        "payoff_ratio": _ratio_or_inf(avg_win, avg_loss),
+        "max_drawdown": max_drawdown,
+        "underwater_weeks": underwater_weeks,
+        "max_losing_streak": _max_losing_streak(trades),
+    }
+
+
 def _build_strategy_detail_payload(
     run_id: str,
     item: dict,
+    trades: list[TradeRecord],
     weekly_series: dict,
 ) -> dict:
     period_pnl = []
@@ -167,6 +244,8 @@ def _build_strategy_detail_payload(
             "max_test_mdd": max_mdd,
             "average_test_pf": average_pf,
         },
+        "period": build_trade_period(trades),
+        "trade_stats": build_trade_stats(trades, weekly_series),
         "equity_curve": weekly_series["equity_curve"],
         "weekly_pnl": weekly_series["weekly_pnl"],
         "period_pnl": period_pnl,
@@ -180,6 +259,43 @@ def _build_strategy_detail_payload(
     }
 
 
+def _ratio_or_inf(numerator: float, denominator: float) -> float:
+    if denominator == 0:
+        return math.inf if numerator > 0 else 0.0
+    return numerator / denominator
+
+
+def _max_losing_streak(trades: list[TradeRecord]) -> int:
+    current = 0
+    max_streak = 0
+    for trade in sorted(trades, key=lambda item: (item.exit_time, item.entry_time)):
+        if trade.pnl < 0:
+            current += 1
+            max_streak = max(max_streak, current)
+        else:
+            current = 0
+    return max_streak
+
+
+def _compute_weekly_risk(equity_curve: list[dict]) -> tuple[float, int]:
+    peak = STARTING_EQUITY
+    max_drawdown = 0.0
+    underwater_weeks = 0
+
+    for point in equity_curve:
+        equity = float(point["equity"])
+        if equity > peak:
+            peak = equity
+            continue
+
+        drawdown = peak - equity
+        if drawdown > 0:
+            underwater_weeks += 1
+            max_drawdown = max(max_drawdown, drawdown)
+
+    return max_drawdown, underwater_weeks
+
+
 def _as_float(value: object) -> float:
     if isinstance(value, str) and value in {"Infinity", "-Infinity", "NaN"}:
         return 5.0 if value == "Infinity" else 0.0
@@ -188,3 +304,15 @@ def _as_float(value: object) -> float:
     if not math.isfinite(number):
         return 5.0 if number > 0 else 0.0
     return number
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            return "NaN"
+        return "Infinity" if value > 0 else "-Infinity"
+    return value

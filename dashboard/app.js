@@ -352,35 +352,30 @@ async function renderStrategyDetail(strategyName) {
     return;
   }
 
+  let detailLoaded = true;
   const detail = await loadStrategyDetail(strategyName).catch((error) => {
-    console.warn("Strategy detail JSON failed to load; falling back to ranking row.", error);
+    console.warn("Strategy detail failed to load; falling back to ranking row.", error);
+    detailLoaded = false;
     return null;
   });
   const source = detail || buildDetailFromRankingRow(row);
-  const summary = source.summary;
-  const kpi = source.kpi;
+  const metrics = extractDetailMetrics(source, row);
 
   showView("detail");
   document.getElementById("detail-strategy-name").textContent = source.strategy_name;
-  document.getElementById("detail-score").textContent = formatNumber(kpi.score);
-  document.getElementById("detail-profit").textContent = formatMoney(kpi.profit);
-  document.getElementById("detail-pass-rate").textContent = formatPercent(kpi.pass_rate);
-  document.getElementById("detail-mdd").textContent = formatMoney(kpi.mdd);
-  document.getElementById("detail-pf").textContent = formatNumber(kpi.pf);
+  document.getElementById("detail-score").textContent = formatNumber(metrics.score);
+  document.getElementById("detail-profit").textContent = formatMoney(metrics.profit);
+  document.getElementById("detail-pass-rate").textContent = formatPercent(metrics.passRate);
+  document.getElementById("detail-mdd").textContent = formatMoney(metrics.mdd);
+  document.getElementById("detail-pf").textContent = formatNumber(metrics.pf);
   document.getElementById("detail-run-id").textContent = source.run_id || currentReport.run_id;
   document.getElementById("detail-generated-at").textContent = formatDateTime(
     currentReport.generated_at,
   );
   document.getElementById("detail-rank").textContent = `#${row.rank}`;
 
-  renderDetailKpis({
-    rank: row.rank,
-    score: summary.score,
-    total_test_net_profit: summary.total_test_net_profit,
-    pass_rate: summary.pass_rate,
-    max_test_mdd: summary.max_test_mdd,
-    average_test_pf: summary.average_test_pf,
-  });
+  renderDetailDataStatus(source, detailLoaded);
+  renderDetailKpis(source, row);
   renderDetailCharts(source);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -410,6 +405,10 @@ function buildDetailFromRankingRow(row) {
     },
     equity_curve: [],
     weekly_pnl: [],
+    period: {
+      start: "",
+      end: "",
+    },
     kpi: {
       score: Number(row.score) || 0,
       profit,
@@ -428,43 +427,204 @@ function findStrategyRow(strategyName) {
   );
 }
 
-function renderDetailKpis(row) {
+function extractDetailMetrics(detail, row) {
+  const summary = detail.summary || {};
+  const kpi = detail.kpi || {};
+  const stats = detail.trade_stats || {};
+  return {
+    score: numericValue(kpi.score ?? summary.score ?? row.score),
+    profit: numericValue(
+      stats.total_profit ??
+        kpi.profit ??
+        summary.total_test_net_profit ??
+        row.total_test_net_profit,
+    ),
+    passRate: numericValue(kpi.pass_rate ?? summary.pass_rate ?? row.pass_rate),
+    mdd: numericValue(
+      stats.max_drawdown ?? kpi.mdd ?? summary.max_test_mdd ?? row.max_test_mdd,
+    ),
+    pf: numericValue(
+      stats.profit_factor ?? kpi.pf ?? summary.average_test_pf ?? row.average_test_pf,
+    ),
+  };
+}
+
+function renderDetailDataStatus(detail, detailLoaded) {
+  const status = document.getElementById("detail-data-status");
+  if (!detailLoaded) {
+    status.textContent =
+      "尚未讀取到 strategy_detail.json，目前使用 ranking 摘要資料";
+    status.classList.add("error");
+    return;
+  }
+
+  if (!hasWeeklySeries(detail)) {
+    status.textContent =
+      "detail JSON 已讀取，但 weekly 資料為空，請重新執行 Run Pipeline";
+    status.classList.add("error");
+    return;
+  }
+
+  if (!detail.trade_stats) {
+    status.textContent =
+      "目前只有排名摘要資料，請重新執行 Run Pipeline 產生完整策略詳情。";
+    status.classList.add("error");
+    return;
+  }
+
+  status.textContent =
+    "已讀取 strategy_detail.json，圖表使用每週資產曲線與每週損益。";
+  status.classList.remove("error");
+}
+
+function renderDetailKpis(detail, row) {
+  const summary = detail.summary || {};
+  const stats = detail.trade_stats || {};
+  const period = detail.period || {};
   const items = [
     {
-      label: "Score 分數",
-      value: formatNumber(row.score),
-      rating: rateScore(row.score),
-      description: "綜合策略評分，越高代表目前 ranking 表現越強。",
+      category: "基本資料",
+      label: "測試期間",
+      value: formatPeriod(period),
+      rating: "",
+      description: "第一筆交易進場日至最後一筆交易出場日。",
     },
     {
-      label: "Total Profit 總獲利",
-      value: formatMoney(row.total_test_net_profit),
-      rating: row.total_test_net_profit > 0 ? "Strong" : "Weak",
-      description: "WFO / Pipeline 測試區間加總淨利。",
+      category: "基本資料",
+      label: "交易比數",
+      value: formatIntegerOrDash(stats.trade_count),
+      rating: "",
+      description: "TXT 解析出的總交易筆數。",
     },
     {
-      label: "Pass Rate 通過率",
-      value: formatPercent(row.pass_rate),
-      rating: ratePassRate(row.pass_rate),
-      description: "WFO rounds 通過比例。",
+      category: "基本資料",
+      label: "多單比數",
+      value: formatIntegerOrDash(stats.long_count),
+      rating: "",
+      description: "direction = 1 的交易筆數。",
     },
     {
-      label: "Max Drawdown 最大回撤",
-      value: formatMoney(row.max_test_mdd),
-      rating: rateMdd(row.max_test_mdd),
-      description: "測試期間最大回撤，越低越好。",
+      category: "基本資料",
+      label: "空單比數",
+      value: formatIntegerOrDash(stats.short_count),
+      rating: "",
+      description: "direction = -1 的交易筆數。",
     },
     {
+      category: "交易品質",
+      label: "勝率",
+      value: formatPercentOrDash(stats.win_rate),
+      rating: rateWinRate(stats.win_rate),
+      description: "獲利交易數 / 總交易數。",
+    },
+    {
+      category: "交易品質",
+      label: "賺錢比數",
+      value: formatIntegerOrDash(stats.win_count),
+      rating: "",
+      description: "pnl > 0 的交易筆數。",
+    },
+    {
+      category: "交易品質",
+      label: "虧錢比數",
+      value: formatIntegerOrDash(stats.loss_count),
+      rating: "",
+      description: "pnl < 0 的交易筆數。",
+    },
+    {
+      category: "交易品質",
       label: "Profit Factor",
-      value: formatNumber(row.average_test_pf),
-      rating: ratePf(row.average_test_pf),
-      description: "平均 test PF，衡量獲利與虧損比例。",
+      value: formatNumberOrDash(stats.profit_factor ?? summary.average_test_pf),
+      rating: ratePf(stats.profit_factor ?? summary.average_test_pf),
+      description: "總獲利 / 總虧損，越高越好。",
     },
     {
-      label: "Rank 排名",
-      value: `#${row.rank}`,
-      rating: row.rank <= 3 ? "Strong" : row.rank <= 10 ? "Watch" : "Weak",
-      description: "目前 ranking report 中的名次。",
+      category: "交易品質",
+      label: "Payoff Ratio",
+      value: formatNumberOrDash(stats.payoff_ratio),
+      rating: ratePayoff(stats.payoff_ratio),
+      description: "平均獲利 / 平均虧損，衡量盈虧結構。",
+    },
+    {
+      category: "交易品質",
+      label: "最多連敗",
+      value: formatIntegerOrDash(stats.max_losing_streak),
+      rating: rateLosingStreak(stats.max_losing_streak),
+      description: "連續 pnl < 0 的最大交易次數。",
+    },
+    {
+      category: "損益表現",
+      label: "總獲利",
+      value: formatMoney(numericValue(stats.total_profit ?? row.total_test_net_profit)),
+      rating: numericValue(stats.total_profit ?? row.total_test_net_profit) > 0 ? "Strong" : "Weak",
+      description: "所有交易 pnl 加總。",
+    },
+    {
+      category: "損益表現",
+      label: "平均每筆損益",
+      value: formatMoneyOrDash(stats.avg_trade_pnl),
+      rating: hasExplicitValue(stats.avg_trade_pnl)
+        ? numericValue(stats.avg_trade_pnl) > 0
+          ? "Strong"
+          : "Weak"
+        : "",
+      description: "總獲利 / 交易比數。",
+    },
+    {
+      category: "損益表現",
+      label: "平均獲利",
+      value: formatMoneyOrDash(stats.avg_win),
+      rating: "",
+      description: "獲利交易的平均 pnl。",
+    },
+    {
+      category: "損益表現",
+      label: "平均虧損",
+      value: formatMoneyOrDash(stats.avg_loss),
+      rating: "",
+      description: "虧損交易平均 pnl 的絕對值。",
+    },
+    {
+      category: "損益表現",
+      label: "最大單筆獲利",
+      value: formatMoneyOrDash(stats.largest_win),
+      rating: "",
+      description: "單筆最大正 pnl。",
+    },
+    {
+      category: "損益表現",
+      label: "最大單筆虧損",
+      value: formatMoneyOrDash(stats.largest_loss),
+      rating: "",
+      description: "單筆最大負 pnl 的絕對值。",
+    },
+    {
+      category: "風險生存",
+      label: "最大回撤",
+      value: formatMoney(numericValue(stats.max_drawdown ?? row.max_test_mdd)),
+      rating: rateMdd(stats.max_drawdown ?? row.max_test_mdd),
+      description: "用 weekly equity curve 計算的最大回撤。",
+    },
+    {
+      category: "風險生存",
+      label: "水下週數",
+      value: formatIntegerOrDash(stats.underwater_weeks),
+      rating: rateUnderwaterWeeks(stats.underwater_weeks),
+      description: "weekly equity 低於歷史高點的週數。",
+    },
+    {
+      category: "風險生存",
+      label: "Score 分數",
+      value: formatNumber(summary.score ?? row.score),
+      rating: rateScore(summary.score ?? row.score),
+      description: "綜合策略評分，越高代表 ranking 表現越強。",
+    },
+    {
+      category: "風險生存",
+      label: "WFO 通過率",
+      value: formatPercent(summary.pass_rate ?? row.pass_rate),
+      rating: ratePassRate(summary.pass_rate ?? row.pass_rate),
+      description: "WFO rounds 通過比例。",
     },
   ];
 
@@ -472,10 +632,13 @@ function renderDetailKpis(row) {
   body.replaceChildren();
   for (const item of items) {
     const tr = document.createElement("tr");
+    appendTextCell(tr, item.category);
     appendTextCell(tr, item.label);
     appendTextCell(tr, item.value);
-    const ratingCell = appendTextCell(tr, item.rating);
-    ratingCell.className = `rating-${item.rating.toLowerCase()}`;
+    const ratingCell = appendTextCell(tr, item.rating || "-");
+    if (item.rating) {
+      ratingCell.className = `rating-${item.rating.toLowerCase()}`;
+    }
     appendTextCell(tr, item.description);
     body.appendChild(tr);
   }
@@ -493,15 +656,9 @@ function renderDetailCharts(detail) {
     return;
   }
 
-  const hasDetailSeries =
-    Array.isArray(detail.equity_curve) &&
-    detail.equity_curve.length > 0 &&
-    Array.isArray(detail.weekly_pnl) &&
-    detail.weekly_pnl.length > 0;
-
-  if (hasDetailSeries) {
-    document.getElementById("detail-equity-title").textContent = "資產曲線";
-    document.getElementById("detail-period-title").textContent = "每期損益";
+  if (hasWeeklySeries(detail)) {
+    document.getElementById("detail-equity-title").textContent = "每週資產曲線";
+    document.getElementById("detail-period-title").textContent = "每週損益";
     renderEquityCurve(detail.equity_curve);
     renderPeriodPnl(detail.weekly_pnl);
     return;
@@ -509,7 +666,16 @@ function renderDetailCharts(detail) {
 
   document.getElementById("detail-equity-title").textContent = "尚未產生週期資料";
   document.getElementById("detail-period-title").textContent = "尚未產生週期資料";
-  renderEmptyDetailCharts();
+  destroyDetailCharts();
+}
+
+function hasWeeklySeries(detail) {
+  return (
+    Array.isArray(detail.equity_curve) &&
+    detail.equity_curve.length > 0 &&
+    Array.isArray(detail.weekly_pnl) &&
+    detail.weekly_pnl.length > 0
+  );
 }
 
 function renderEquityCurve(equityCurve) {
@@ -523,7 +689,7 @@ function renderEquityCurve(equityCurve) {
       labels: equityCurve.map((item) => item.week),
       datasets: [
         {
-          label: "資產曲線",
+          label: "每週資產曲線",
           data: equityCurve.map((item) => item.equity),
           borderColor: "#2563eb",
           backgroundColor: "rgba(37, 99, 235, 0.12)",
@@ -533,7 +699,7 @@ function renderEquityCurve(equityCurve) {
         },
       ],
     },
-    options: detailChartOptions("累積損益"),
+    options: detailChartOptions("資產", false),
   });
 }
 
@@ -548,7 +714,7 @@ function renderPeriodPnl(weeklyPnl) {
       labels: weeklyPnl.map((item) => item.week),
       datasets: [
         {
-          label: "每期損益",
+          label: "每週損益",
           data: weeklyPnl.map((item) => item.pnl),
           backgroundColor: weeklyPnl.map((item) =>
             item.pnl >= 0 ? "#10b981" : "#d32f2f",
@@ -558,11 +724,11 @@ function renderPeriodPnl(weeklyPnl) {
         },
       ],
     },
-    options: detailChartOptions("損益"),
+    options: detailChartOptions("損益", true),
   });
 }
 
-function renderEmptyDetailCharts() {
+function destroyDetailCharts() {
   if (detailEquityChart) {
     detailEquityChart.destroy();
     detailEquityChart = null;
@@ -571,39 +737,9 @@ function renderEmptyDetailCharts() {
     detailPeriodChart.destroy();
     detailPeriodChart = null;
   }
-
-  detailEquityChart = new Chart(document.getElementById("detail-equity-chart"), {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "尚未產生週期資料",
-          data: [],
-          borderColor: "#94a3b8",
-        },
-      ],
-    },
-    options: detailChartOptions("equity"),
-  });
-
-  detailPeriodChart = new Chart(document.getElementById("detail-period-chart"), {
-    type: "bar",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "尚未產生週期資料",
-          data: [],
-          backgroundColor: "#cbd5e1",
-        },
-      ],
-    },
-    options: detailChartOptions("pnl"),
-  });
 }
 
-function detailChartOptions(yTitle) {
+function detailChartOptions(yTitle, beginAtZero = true) {
   return {
     maintainAspectRatio: false,
     responsive: true,
@@ -615,7 +751,7 @@ function detailChartOptions(yTitle) {
         grid: { display: false },
       },
       y: {
-        beginAtZero: true,
+        beginAtZero,
         title: { display: true, text: yTitle },
         grid: { color: "#eef2f7" },
       },
@@ -671,26 +807,66 @@ function renderBarChart(canvasId, labels, values, label, color, existingChart) {
 }
 
 function rateScore(value) {
-  if (value >= 100) return "Strong";
-  if (value >= 80) return "Watch";
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number >= 100) return "Strong";
+  if (number >= 80) return "Watch";
   return "Weak";
 }
 
 function ratePassRate(value) {
-  if (value >= 0.6) return "Strong";
-  if (value >= 0.4) return "Watch";
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number >= 0.6) return "Strong";
+  if (number >= 0.4) return "Watch";
+  return "Weak";
+}
+
+function rateWinRate(value) {
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number >= 0.55) return "Strong";
+  if (number >= 0.45) return "Watch";
   return "Weak";
 }
 
 function ratePf(value) {
-  if (value >= 1.5) return "Strong";
-  if (value >= 1.1) return "Watch";
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number >= 1.5) return "Strong";
+  if (number >= 1.1) return "Watch";
+  return "Weak";
+}
+
+function ratePayoff(value) {
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number >= 1.2) return "Strong";
+  if (number >= 0.8) return "Watch";
   return "Weak";
 }
 
 function rateMdd(value) {
-  if (value <= 10000) return "Strong";
-  if (value <= 20000) return "Watch";
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number <= 10000) return "Strong";
+  if (number <= 20000) return "Watch";
+  return "Weak";
+}
+
+function rateUnderwaterWeeks(value) {
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number <= 8) return "Strong";
+  if (number <= 20) return "Watch";
+  return "Weak";
+}
+
+function rateLosingStreak(value) {
+  if (!hasExplicitValue(value)) return "";
+  const number = numericValue(value);
+  if (number <= 3) return "Strong";
+  if (number <= 6) return "Watch";
   return "Weak";
 }
 
@@ -698,23 +874,74 @@ function shortName(value) {
   return value.length > 16 ? `${value.slice(0, 16)}...` : value;
 }
 
+function hasExplicitValue(value) {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function numericValue(value) {
+  if (!hasExplicitValue(value)) {
+    return 0;
+  }
+  if (value === "Infinity") return Infinity;
+  if (value === "-Infinity") return -Infinity;
+  const number = Number(value);
+  return Number.isNaN(number) ? 0 : number;
+}
+
+function formatNumberOrDash(value) {
+  return hasExplicitValue(value) ? formatNumber(value) : "-";
+}
+
+function formatMoneyOrDash(value) {
+  return hasExplicitValue(value) ? formatMoney(value) : "-";
+}
+
+function formatPercentOrDash(value) {
+  return hasExplicitValue(value) ? formatPercent(value) : "-";
+}
+
+function formatIntegerOrDash(value) {
+  if (!hasExplicitValue(value)) {
+    return "-";
+  }
+  return new Intl.NumberFormat("zh-TW", {
+    maximumFractionDigits: 0,
+  }).format(numericValue(value));
+}
+
+function formatPeriod(period) {
+  if (!period || !period.start || !period.end) {
+    return "-";
+  }
+  return `${period.start} ～ ${period.end}`;
+}
+
 function formatNumber(value) {
+  const number = numericValue(value);
+  if (!Number.isFinite(number)) {
+    return number > 0 ? "∞" : "-∞";
+  }
   return new Intl.NumberFormat("zh-TW", {
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(number);
 }
 
 function formatMoney(value) {
+  const number = numericValue(value);
+  if (!Number.isFinite(number)) {
+    return number > 0 ? "∞" : "-∞";
+  }
   return new Intl.NumberFormat("zh-TW", {
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(number);
 }
 
 function formatPercent(value) {
+  const number = numericValue(value);
   return new Intl.NumberFormat("zh-TW", {
     style: "percent",
     maximumFractionDigits: 1,
-  }).format(value);
+  }).format(number);
 }
 
 function formatDateTime(value) {

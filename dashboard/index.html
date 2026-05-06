@@ -276,8 +276,10 @@
       td:nth-child(2),
       .kpi-table td:first-child,
       .kpi-table th:first-child,
-      .kpi-table td:nth-child(4),
-      .kpi-table th:nth-child(4) {
+      .kpi-table td:nth-child(2),
+      .kpi-table th:nth-child(2),
+      .kpi-table td:nth-child(5),
+      .kpi-table th:nth-child(5) {
         text-align: left;
       }
 
@@ -305,11 +307,11 @@
       }
 
       .detail-chart-card {
-        height: 340px;
+        height: 392px;
       }
 
       .detail-chart-card .chart-box {
-        height: 272px;
+        height: 320px;
       }
 
       .chart-box canvas {
@@ -334,6 +336,10 @@
 
       .detail-title {
         overflow-wrap: anywhere;
+      }
+
+      .detail-status {
+        margin: 14px 0 0;
       }
 
       .kpi-table .rating-strong {
@@ -526,17 +532,18 @@
               <div id="detail-rank" class="meta-value">-</div>
             </div>
           </div>
+          <p id="detail-data-status" class="status detail-status"></p>
         </section>
 
         <section class="chart-grid">
           <div class="panel detail-chart-card">
-            <h2 id="detail-equity-title">資產曲線</h2>
+            <h2 id="detail-equity-title">每週資產曲線</h2>
             <div class="chart-box">
               <canvas id="detail-equity-chart"></canvas>
             </div>
           </div>
           <div class="panel detail-chart-card">
-            <h2 id="detail-period-title">每期損益</h2>
+            <h2 id="detail-period-title">每週損益</h2>
             <div class="chart-box">
               <canvas id="detail-period-chart"></canvas>
             </div>
@@ -549,6 +556,7 @@
             <table class="kpi-table">
               <thead>
                 <tr>
+                  <th>類別</th>
                   <th>指標</th>
                   <th>數值</th>
                   <th>評估</th>
@@ -564,7 +572,7 @@
           <h2>策略說明</h2>
           <ul class="note-list">
             <li>這是 WFO / Pipeline 結果。</li>
-            <li>目前詳情頁使用 ranking report 資料，不包含完整逐筆交易明細。</li>
+            <li>完整詳情頁使用 strategy_detail.json 的 weekly series 與交易統計，不顯示逐筆交易明細。</li>
             <li>這不是實盤績效，也不代表未來保證。</li>
             <li>策略仍需經過 Forward Test 與人工審核。</li>
           </ul>

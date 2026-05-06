@@ -1,7 +1,8 @@
+import math
 from datetime import datetime
 
 from mqre_v2.core.trades import TradeRecord
-from mqre_v2.runs.run_pipeline import build_weekly_series
+from mqre_v2.runs.run_pipeline import build_trade_stats, build_weekly_series
 
 
 def _trade(exit_time: str, pnl: float) -> TradeRecord:
@@ -44,3 +45,32 @@ def test_build_weekly_series_accumulates_equity_curve() -> None:
         {"week": "2024-W02", "equity": 101200.0},
         {"week": "2024-W03", "equity": 101000.0},
     ]
+
+
+def test_trade_stats_uses_weekly_equity_for_risk() -> None:
+    trades = [
+        _trade("2024-01-02T09:05:00", 500.0),
+        _trade("2024-01-09T09:05:00", -700.0),
+        _trade("2024-01-16T09:05:00", -100.0),
+        _trade("2024-01-23T09:05:00", 900.0),
+    ]
+    weekly_series = build_weekly_series(trades)
+
+    stats = build_trade_stats(trades, weekly_series)
+
+    assert stats["underwater_weeks"] == 2
+    assert stats["max_drawdown"] == 800.0
+    assert stats["max_losing_streak"] == 2
+
+
+def test_trade_stats_uses_infinity_for_no_loss_ratios() -> None:
+    trades = [
+        _trade("2024-01-02T09:05:00", 500.0),
+        _trade("2024-01-09T09:05:00", 700.0),
+    ]
+    weekly_series = build_weekly_series(trades)
+
+    stats = build_trade_stats(trades, weekly_series)
+
+    assert math.isinf(stats["profit_factor"])
+    assert math.isinf(stats["payoff_ratio"])

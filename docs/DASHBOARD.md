@@ -120,6 +120,31 @@ https://raw.githubusercontent.com/Hsu7183/mqquant-research-engine/main/runs/late
     "max_test_mdd": 0.0,
     "average_test_pf": 0.0
   },
+  "period": {
+    "start": "2024-01-01",
+    "end": "2024-06-30"
+  },
+  "trade_stats": {
+    "trade_count": 120,
+    "long_count": 60,
+    "short_count": 60,
+    "win_count": 66,
+    "loss_count": 54,
+    "win_rate": 0.55,
+    "total_profit": 12500.0,
+    "avg_trade_pnl": 104.17,
+    "avg_win": 450.0,
+    "avg_loss": 318.0,
+    "largest_win": 2300.0,
+    "largest_loss": 1500.0,
+    "gross_profit": 29700.0,
+    "gross_loss": 17200.0,
+    "profit_factor": 1.73,
+    "payoff_ratio": 1.42,
+    "max_drawdown": 8300.0,
+    "underwater_weeks": 6,
+    "max_losing_streak": 3
+  },
   "equity_curve": [
     { "week": "2024-W01", "equity": 100500.0 }
   ],
@@ -148,9 +173,29 @@ https://raw.githubusercontent.com/Hsu7183/mqquant-research-engine/main/runs/late
    - KPI 表與 Strong / Watch / Weak 評等
 3. 若 detail JSON 不存在或讀取失敗，fallback 使用 ranking row：
    - 顯示 ranking report 可用 KPI
-   - 圖表顯示「尚未產生週期資料」
+   - 顯示「尚未讀取到 strategy_detail.json，目前使用 ranking 摘要資料」
+4. 若 detail JSON 有讀取到但 `equity_curve` / `weekly_pnl` 為空：
+   - 顯示「detail JSON 已讀取，但 weekly 資料為空，請重新執行 Run Pipeline」
+   - 不建立空白 Chart.js 圖表
 
-詳情頁目前不包含完整逐筆交易明細，也不假裝有交易明細。若未來要顯示逐筆交易，需另行擴充 report schema 或提供交易明細 JSON。
+KPI 表目前包含：
+
+- 測試期間
+- 交易比數 / 多單比數 / 空單比數
+- 勝率 / 賺錢比數 / 虧錢比數
+- Profit Factor
+- Payoff Ratio
+- 最多連敗
+- 總獲利 / 平均每筆損益 / 平均獲利 / 平均虧損
+- 最大單筆獲利 / 最大單筆虧損
+- 最大回撤
+- 水下週數
+- Score 分數
+- WFO 通過率
+
+詳情頁目前不顯示完整逐筆交易明細，也不假裝有交易明細。若未來要顯示逐筆交易，需另行擴充 report schema 或提供交易明細 JSON。
+
+若圖表空白，通常代表 `runs/latest/reports/details/{strategy_name}.json` 未更新或未推上 GitHub。請重新執行 Run Pipeline，確認 `reports/details` 內有 strategy detail JSON，再 push 最新報表。
 
 ## 畫面內容
 
