@@ -31,6 +31,8 @@ mqquant-research-engine/
 - XS / TXT research pipeline
 - Trade TXT parser
 - M1 OHLC TXT parser
+- M1 Backtest MVP
+- L1-L4 one-click pipeline
 - WFO window generation, result schema, gates, and runner
 - TXT -> WFO -> ranking JSON pipeline
 - Auto Research Pipeline
@@ -46,16 +48,18 @@ mqquant-research-engine/
 ## Current Flow
 
 ```text
-TXT folder
--> WFO Pipeline
--> Ranking JSON
--> TopN
--> Forward candidate
--> Forward Evaluation
--> Strategy Registry
--> Promotion Recommendation
--> Decision Audit Log
+M1
+-> Backtest
+-> Trade TXT
+-> Ranking
+-> Detail
+-> Forward
+-> Auto Promotion
+-> Audit
+-> Dashboard
 ```
+
+The current M1 strategy logic is `SimpleM1Strategy`, an MVP adapter used to prove the full data path. It is not the formal 0313 / 1001 / 0807 strategy logic.
 
 ## Launch
 
@@ -87,6 +91,18 @@ Dashboard:
 
 ```text
 https://hsu7183.github.io/mqquant-research-engine/dashboard/
+```
+
+One-click local update from M1 to GitHub dashboard:
+
+```cmd
+run_all_pipeline.cmd
+```
+
+or:
+
+```powershell
+.\run_all_pipeline.ps1
 ```
 
 ## Standard Version Cleanup

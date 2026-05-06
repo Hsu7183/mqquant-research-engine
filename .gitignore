@@ -16,6 +16,7 @@ logs/
 run_history/
 runs/*
 !runs/latest/
+runs/latest/*
 !runs/latest/reports/
 !runs/latest/reports/**
 artifacts/

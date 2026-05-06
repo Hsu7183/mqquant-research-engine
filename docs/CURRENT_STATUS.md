@@ -7,7 +7,6 @@ Date: 2026-05-06
 - version: v2 standard
 - system type: strategy governance system, not execution system
 - cleanup status: standard repository layout finalized
-- latest verified tests before this update: `219 passed`
 
 ## Standard Layout
 
@@ -38,6 +37,7 @@ Reason:
 - Trade TXT Parser
 - M1 OHLC TXT Parser
 - M1 Backtest MVP
+- L1-L4 Pipeline CLI
 - WFO Window Generator
 - WFO Result Schema
 - WFO Pass/Fail Gate
@@ -66,29 +66,34 @@ Reason:
 
 ## Latest Core Flow
 
-M1 demo flow:
+Formal L1-L4 flow:
 
 ```text
-M1 TXT
--> BarRecord
--> SimpleM1StrategyParams
--> TradeRecord
+M1
+-> Backtest
 -> Trade TXT
--> WFO / Dashboard Pipeline
+-> Ranking
+-> Detail
+-> Forward
+-> Auto Promotion
+-> Audit
+-> Dashboard
 ```
 
-Research governance flow:
+Detailed flow:
 
 ```text
-TXT folder
--> WFO Pipeline
+M1 行情資料
+-> SimpleM1Strategy MVP 回測
+-> TradeRecord / Trade TXT
+-> Run Latest Pipeline
 -> Ranking JSON
--> TopN
--> Forward candidate
--> Forward Evaluation
--> Strategy Registry active
--> Promotion Recommendation
+-> Strategy Detail JSON
+-> Auto Research
+-> Forward Log
+-> Auto Promotion Recommendation
 -> Decision Audit Log
+-> Dashboard
 ```
 
 ## GUI Modes
@@ -111,12 +116,12 @@ TXT folder
 - 不下單
 - 不自動切換實盤策略
 - promoted / active strategy registry 只代表治理狀態，不代表實盤執行
-- M1 Backtest MVP 是簡化研究流程，不是正式 0313 / 1001 策略
+- SimpleM1Strategy 是 MVP 策略邏輯
+- 下一步才會替換為正式 0313 / 1001 / 0807 策略邏輯
 
 ## Next Direction
 
 1. Keep `runs/latest/reports/` updated for dashboard.
-2. Add real TXT exports into pipeline runs.
-3. Replace the simple M1 MVP with formal 0313 / 1001 strategy adapters when ready.
-4. Continue v2-v4 governance/reporting improvements.
-5. Keep v5 execution layer out of scope.
+2. Replace the simple M1 MVP with formal 0313 / 1001 / 0807 strategy adapters.
+3. Continue v2-v4 governance/reporting improvements.
+4. Keep v5 execution layer out of scope.

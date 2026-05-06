@@ -84,7 +84,12 @@ def _export_auto_research_json(
     top_n_results: list[dict[str, Any]],
 ) -> None:
     payload = {
+        "run_id": "latest",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "summary": {
+            "total_strategies": len(ranking),
+            "valid_strategies": len(ranking),
+        },
         "total_strategies": len(ranking),
         "top_n": top_n_results,
         "top_10": ranking[:10],

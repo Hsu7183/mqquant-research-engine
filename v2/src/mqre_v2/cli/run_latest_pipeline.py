@@ -29,27 +29,28 @@ def get_latest_run(base_dir: str) -> str:
     return str(run_dirs[-1])
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Run the latest mqquant pipeline.")
-    parser.add_argument("--base-dir", default="runs")
-    parser.add_argument("--start-date", default="2020-01-01")
-    parser.add_argument("--end-date", default=date.today().isoformat())
-    parser.add_argument("--output-filename", default="ranking.json")
-    args = parser.parse_args(argv)
+def run_latest_pipeline(
+    base_dir: str = "runs",
+    start_date: date | None = None,
+    end_date: date | None = None,
+    output_filename: str = "ranking.json",
+) -> dict:
+    start = start_date or date(2020, 1, 1)
+    end = end_date or date.today()
 
-    run_path = get_latest_run(args.base_dir)
+    run_path = get_latest_run(base_dir)
     manifest_path = Path(run_path) / "manifest.json"
     if not manifest_path.is_file():
         txt_dir = Path(run_path) / "txt"
         if txt_dir.is_dir() and any(txt_dir.glob("*.txt")):
             ranking = run_txt_wfo_pipeline(
                 txt_folder=str(txt_dir),
-                start_date=date.fromisoformat(args.start_date),
-                end_date=date.fromisoformat(args.end_date),
+                start_date=start,
+                end_date=end,
                 gate_config={},
                 include_wfo_details=True,
             )
-            ranking_path = Path(run_path) / "reports" / args.output_filename
+            ranking_path = Path(run_path) / "reports" / output_filename
             report_rows = [_to_report_row(item) for item in ranking]
             detail_paths = _write_strategy_detail_reports(
                 Path(run_path),
@@ -60,26 +61,18 @@ def main(argv: Sequence[str] | None = None) -> None:
                 _build_report_payload(Path(run_path).name, report_rows),
                 str(ranking_path),
             )
-            print(
-                json.dumps(
-                    {
-                        "run_id": Path(run_path).name,
-                        "run_path": run_path,
-                        "total_strategies": len(ranking),
-                        "valid_txt": len(ranking),
-                        "output_json_path": str(ranking_path),
-                        "detail_json_count": len(detail_paths),
-                        "details_generated_from": "txt",
-                        "top_10": ranking[:10],
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                    allow_nan=False,
-                )
-            )
-            return
+            return {
+                "run_id": Path(run_path).name,
+                "run_path": run_path,
+                "total_strategies": len(ranking),
+                "valid_txt": len(ranking),
+                "output_json_path": str(ranking_path),
+                "detail_json_count": len(detail_paths),
+                "details_generated_from": "txt",
+                "top_10": ranking[:10],
+            }
 
-        ranking_path = Path(run_path) / "reports" / args.output_filename
+        ranking_path = Path(run_path) / "reports" / output_filename
         if not ranking_path.is_file():
             raise FileNotFoundError(
                 f"latest run has no manifest and no ranking report: {run_path}"
@@ -87,42 +80,51 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         detail_paths = write_ranking_summary_detail_reports(str(ranking_path))
         report = json.loads(ranking_path.read_text(encoding="utf-8"))
-        print(
-            json.dumps(
-                {
-                    "run_id": report.get("run_id", Path(run_path).name),
-                    "run_path": run_path,
-                    "total_strategies": len(report.get("all_results", [])),
-                    "valid_txt": 0,
-                    "output_json_path": str(ranking_path),
-                    "detail_json_count": len(detail_paths),
-                    "details_generated_from": "ranking_summary",
-                    "top_10": report.get("top_10", []),
-                },
-                ensure_ascii=False,
-                indent=2,
-                allow_nan=False,
-            )
-        )
-        return
+        return {
+            "run_id": report.get("run_id", Path(run_path).name),
+            "run_path": run_path,
+            "total_strategies": len(report.get("all_results", [])),
+            "valid_txt": 0,
+            "output_json_path": str(ranking_path),
+            "detail_json_count": len(detail_paths),
+            "details_generated_from": "ranking_summary",
+            "top_10": report.get("top_10", []),
+        }
 
     result = run_pipeline_from_run(
         run_path=run_path,
+        start_date=start,
+        end_date=end,
+        output_filename=output_filename,
+    )
+
+    return {
+        "run_id": result.run_id,
+        "run_path": run_path,
+        "total_strategies": result.total_strategies,
+        "valid_txt": result.valid_txt,
+        "output_json_path": result.output_json_path,
+        "top_10": result.ranking[:10],
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the latest mqquant pipeline.")
+    parser.add_argument("--base-dir", default="runs")
+    parser.add_argument("--start-date", default="2020-01-01")
+    parser.add_argument("--end-date", default=date.today().isoformat())
+    parser.add_argument("--output-filename", default="ranking.json")
+    args = parser.parse_args(argv)
+
+    result = run_latest_pipeline(
+        base_dir=args.base_dir,
         start_date=date.fromisoformat(args.start_date),
         end_date=date.fromisoformat(args.end_date),
         output_filename=args.output_filename,
     )
-
     print(
         json.dumps(
-            {
-                "run_id": result.run_id,
-                "run_path": run_path,
-                "total_strategies": result.total_strategies,
-                "valid_txt": result.valid_txt,
-                "output_json_path": result.output_json_path,
-                "top_10": result.ranking[:10],
-            },
+            result,
             ensure_ascii=False,
             indent=2,
             allow_nan=False,
