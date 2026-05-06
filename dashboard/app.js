@@ -290,8 +290,8 @@ function renderTable(rows) {
     const tr = document.createElement("tr");
     const cells = [
       item.rank,
-      item.strategy_name,
       parseStrategyFamily(item.strategy_name),
+      item.strategy_name,
       formatNumber(item.score),
       formatMoney(item.total_test_net_profit),
       formatPercent(item.pass_rate),
@@ -318,18 +318,18 @@ function renderTable(rows) {
 }
 
 function parseStrategyFamily(strategyName) {
-  const families = [
-    "trend_breakout",
-    "open_range_breakout",
-    "vwap_pullback",
-    "mean_reversion_range",
-    "volume_breakout",
-    "breakdown_momentum",
-    "slow_grind_trend",
-    "afternoon_trend_extension",
-  ];
-  for (const family of families) {
-    if (strategyName.startsWith(`${family}_`)) return family;
+  const familyNames = {
+    trend_breakout: "趨勢突破",
+    open_range_breakout: "開盤區間突破",
+    vwap_pullback: "VWAP 拉回",
+    mean_reversion_range: "區間均值回歸",
+    volume_breakout: "量能突破",
+    breakdown_momentum: "急跌/急漲動能",
+    slow_grind_trend: "緩步趨勢",
+    afternoon_trend_extension: "午後趨勢延伸",
+  };
+  for (const [family, label] of Object.entries(familyNames)) {
+    if (strategyName.startsWith(`${family}_`)) return label;
   }
   return strategyName.split("_").slice(0, -1).join("_") || strategyName;
 }
@@ -353,7 +353,7 @@ function renderCharts(rows) {
     "profit-chart",
     labels,
     rows.map((item) => item.total_test_net_profit),
-    "總獲利",
+    "扣成本後總損益",
     "#10b981",
     profitChart,
   );
@@ -394,6 +394,7 @@ async function renderStrategyDetail(strategyName) {
 
   renderDetailDataStatus(source, detailLoaded);
   renderDetailKpis(source, row);
+  renderCostStress(source);
   renderDetailCharts(source);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -572,10 +573,10 @@ function renderDetailKpis(detail, row) {
     },
     {
       category: "損益表現",
-      label: "總獲利",
+      label: "扣成本後總損益",
       value: formatMoney(numericValue(stats.total_profit ?? row.total_test_net_profit)),
       rating: numericValue(stats.total_profit ?? row.total_test_net_profit) > 0 ? "Strong" : "Weak",
-      description: "所有交易 pnl 加總。",
+      description: "所有交易 net pnl 加總。",
     },
     {
       category: "損益表現",
@@ -646,6 +647,8 @@ function renderDetailKpis(detail, row) {
     },
   ];
 
+  items.push(...buildCostKpiItems(detail));
+
   const body = document.getElementById("detail-kpi-body");
   body.replaceChildren();
   for (const item of items) {
@@ -658,6 +661,60 @@ function renderDetailKpis(detail, row) {
       ratingCell.className = `rating-${item.rating.toLowerCase()}`;
     }
     appendTextCell(tr, item.description);
+    body.appendChild(tr);
+  }
+}
+
+function buildCostKpiItems(detail) {
+  const cost = detail.cost || {};
+  const stats = detail.trade_stats || {};
+  return [
+    ["單邊滑點", formatNumberOrDash(cost.slippage_points_per_side), "每次進場或出場假設滑點"],
+    ["來回滑點", formatNumberOrDash(cost.round_trip_slippage_points), "一筆完整交易的進出場滑點"],
+    ["單邊手續費", formatMoneyOrDash(cost.fee_money_per_side), "單邊手續費金額"],
+    ["來回手續費", formatMoneyOrDash(cost.round_trip_fee_money), "一筆完整交易手續費"],
+    ["期交稅率", hasExplicitValue(cost.tax_rate) ? String(cost.tax_rate) : "-", "股價類期貨交易稅率"],
+    ["每點價值", formatMoneyOrDash(cost.point_value), "小台預設每點 50 元"],
+    ["口數", formatIntegerOrDash(cost.qty), "回測換算口數"],
+    ["總滑點成本", formatMoneyOrDash(cost.total_slippage_cost_points), "所有交易滑點成本點數"],
+    ["總手續費成本", formatMoneyOrDash(cost.total_fee_cost_points), "所有交易手續費換算點數"],
+    ["總期交稅成本", formatMoneyOrDash(cost.total_tax_cost_points), "所有交易期交稅換算點數"],
+    ["總交易成本", formatMoneyOrDash(cost.total_cost_points ?? stats.total_cost), "滑點、手續費與期交稅總和"],
+    ["平均每筆成本", formatMoneyOrDash(cost.avg_cost_per_trade_points ?? stats.avg_cost_per_trade), "每筆交易平均成本點數"],
+    ["扣成本後平均每筆損益", formatMoneyOrDash(stats.avg_net_pnl_per_trade), "net pnl / trade count"],
+    ["扣成本後總損益", formatMoneyOrDash(stats.net_total_profit ?? stats.total_profit), "扣除完整交易成本後的總損益"],
+  ].map(([label, value, description]) => ({
+    category: "交易成本",
+    label,
+    value,
+    rating: "",
+    description,
+  }));
+}
+
+function renderCostStress(detail) {
+  const body = document.getElementById("detail-cost-stress-body");
+  if (!body) return;
+  body.replaceChildren();
+
+  const rows = Array.isArray(detail.cost_stress) ? detail.cost_stress : [];
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 5;
+    cell.textContent = "尚未產生成本壓力測試資料，請重新執行 Run Pipeline。";
+    tr.appendChild(cell);
+    body.appendChild(tr);
+    return;
+  }
+
+  for (const item of rows) {
+    const tr = document.createElement("tr");
+    appendTextCell(tr, formatNumber(item.slippage_points));
+    appendTextCell(tr, formatMoney(item.total_net_pnl));
+    appendTextCell(tr, formatNumber(item.profit_factor));
+    appendTextCell(tr, formatMoney(item.max_drawdown));
+    appendTextCell(tr, item.passed ? "通過" : "未通過");
     body.appendChild(tr);
   }
 }

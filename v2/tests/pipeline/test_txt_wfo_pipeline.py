@@ -4,6 +4,7 @@ import json
 from datetime import date
 from pathlib import Path
 
+from mqre_v2.backtest.costs import CostConfig
 from mqre_v2.pipeline.txt_wfo_pipeline import (
     export_pipeline_result,
     run_txt_wfo_pipeline,
@@ -54,6 +55,25 @@ def test_run_txt_wfo_pipeline_sorts_by_score_desc(tmp_path: Path) -> None:
     scores = [float(result["score"]) for result in results]
 
     assert scores == sorted(scores, reverse=True)
+
+
+def test_run_txt_wfo_pipeline_uses_net_pnl_for_ranking_metrics(tmp_path: Path) -> None:
+    _write_sample_txt(tmp_path / "baseline.txt")
+
+    results = run_txt_wfo_pipeline(
+        txt_folder=str(tmp_path),
+        start_date=date(2023, 1, 1),
+        end_date=date(2023, 3, 31),
+        gate_config=_gate_config(),
+        cost_config=CostConfig(slippage_points_per_side=2.0, tax_rate=0.0),
+        include_wfo_details=True,
+    )
+
+    result = results[0]
+    assert result["raw_total_profit"] == 10.0
+    assert result["net_total_profit"] == 2.0
+    assert result["total_cost"] == 8.0
+    assert result["summary"]["total_test_net_profit"] == 2.0
 
 
 def test_export_pipeline_result_writes_json(tmp_path: Path) -> None:

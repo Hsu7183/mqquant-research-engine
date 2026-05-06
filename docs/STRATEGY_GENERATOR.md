@@ -74,3 +74,18 @@ M1 行情
 - 策略生成不保證獲利
 - 必須經過 forward test
 - promotion recommendation 仍需人工確認
+
+## 交易成本模型
+
+策略搜尋、WFO ranking、weekly_pnl、equity_curve、strategy_detail KPI 與 dashboard 顯示，預設全部使用扣成本後 net pnl。
+
+預設台指期成本假設：
+
+- 小台 `point_value = 50`
+- 單邊滑點 `slippage_points_per_side = 2`
+- 來回滑點 4 點
+- 期交稅率 `tax_rate = 0.00002`
+- 單邊手續費 `fee_money_per_side = 0`，可用 `--fee-money` 指定
+- 口數 `qty = 1`
+
+1 分 K 短線策略若不納入滑點、手續費與期交稅，績效會嚴重高估。因此所有 generated strategy 都必須經過成本壓力測試，觀察 2、3、4、5 點單邊滑點情境下是否仍具備正淨利與合理 PF。

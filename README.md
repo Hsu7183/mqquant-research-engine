@@ -32,6 +32,7 @@ mqquant-research-engine/
 - Trade TXT parser
 - M1 OHLC TXT parser
 - Intraday futures strategy generator
+- Full futures trading cost model
 - M1 Backtest MVP
 - L1-L4 one-click pipeline
 - WFO window generation, result schema, gates, and runner
@@ -62,6 +63,20 @@ M1
 ```
 
 The system does not hard-code 0313 or 1001plus+. It generates multiple intraday futures strategy families and then filters them through L1-L4. `SimpleM1Strategy` remains an MVP adapter; formal 0313 / 1001 / 0807 adapters can be plugged in later.
+
+## Trading Cost Model
+
+All rankings, WFO metrics, weekly PnL, equity curves, detail KPI, and dashboard summaries use net performance after trading costs by default.
+
+Default Taiwan index futures assumptions:
+
+- `point_value = 50` for 小台
+- `slippage_points_per_side = 2`
+- `tax_rate = 0.00002`
+- `fee_money_per_side = 0`, configurable with `--fee-money`
+- `qty = 1`
+
+One-minute intraday strategies must pass cost-aware ranking and cost stress review before any forward-test decision.
 
 ## Launch
 

@@ -5,6 +5,7 @@ from math import inf
 from pathlib import Path
 from typing import Any
 
+from mqre_v2.backtest.costs import CostConfig, net_pnl_points_for_trade
 from mqre_v2.core.trades import TradeRecord
 from mqre_v2.io.txt_parser import parse_xs_txt
 from mqre_v2.validation.wfo.results import WfoRoundResult
@@ -18,7 +19,10 @@ class TxtWfoInput:
     params_hash: str = "txt-import"
 
 
-def compute_trade_metrics(trades: list[TradeRecord]) -> dict[str, float | int]:
+def compute_trade_metrics(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None = None,
+) -> dict[str, float | int]:
     if not trades:
         return {
             "net_profit": 0.0,
@@ -27,7 +31,10 @@ def compute_trade_metrics(trades: list[TradeRecord]) -> dict[str, float | int]:
             "trade_count": 0,
         }
 
-    pnl_values = [trade.pnl for trade in trades]
+    pnl_values = [
+        _pnl_for_metrics(trade, cost_config)
+        for trade in trades
+    ]
     gross_profit = sum(value for value in pnl_values if value > 0)
     gross_loss = abs(sum(value for value in pnl_values if value < 0))
 
@@ -44,7 +51,10 @@ def compute_trade_metrics(trades: list[TradeRecord]) -> dict[str, float | int]:
     }
 
 
-def build_txt_evaluate_fn(txt_input: TxtWfoInput):
+def build_txt_evaluate_fn(
+    txt_input: TxtWfoInput,
+    cost_config: CostConfig | None = None,
+):
     all_trades = parse_xs_txt(Path(txt_input.txt_path).read_text(encoding="utf-8-sig"))
 
     def evaluate_fn(window: WfoWindow, optimizer_result: Any) -> WfoRoundResult:
@@ -53,7 +63,7 @@ def build_txt_evaluate_fn(txt_input: TxtWfoInput):
             for trade in all_trades
             if window.test_start <= trade.exit_time.date() <= window.test_end
         ]
-        metrics = compute_trade_metrics(filtered_trades)
+        metrics = compute_trade_metrics(filtered_trades, cost_config=cost_config)
 
         return WfoRoundResult(
             round_id=window.round_id,
@@ -91,6 +101,12 @@ def _max_drawdown(pnl_values: list[float]) -> float:
         max_drawdown = max(max_drawdown, running_peak - equity)
 
     return float(max_drawdown)
+
+
+def _pnl_for_metrics(trade: TradeRecord, cost_config: CostConfig | None) -> float:
+    if cost_config is None:
+        return float(trade.pnl)
+    return net_pnl_points_for_trade(trade, cost_config)
 
 
 def _get_value(source: Any, name: str, default: Any) -> Any:

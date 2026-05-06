@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Sequence
 
+from mqre_v2.backtest.costs import CostConfig
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_pipeline import (
@@ -34,9 +35,12 @@ def run_latest_pipeline(
     start_date: date | None = None,
     end_date: date | None = None,
     output_filename: str = "ranking.json",
+    cost_config: CostConfig | None = None,
+    strategy_quality: dict | None = None,
 ) -> dict:
     start = start_date or date(2020, 1, 1)
     end = end_date or date.today()
+    effective_cost = cost_config or CostConfig()
 
     run_path = get_latest_run(base_dir)
     manifest_path = Path(run_path) / "manifest.json"
@@ -49,6 +53,8 @@ def run_latest_pipeline(
                 end_date=end,
                 gate_config={},
                 include_wfo_details=True,
+                cost_config=effective_cost,
+                strategy_quality=strategy_quality,
             )
             ranking_path = Path(run_path) / "reports" / output_filename
             report_rows = [_to_report_row(item) for item in ranking]
@@ -56,6 +62,7 @@ def run_latest_pipeline(
                 Path(run_path),
                 Path(run_path).name,
                 ranking,
+                effective_cost,
             )
             export_json_report(
                 _build_report_payload(Path(run_path).name, report_rows),
@@ -96,6 +103,7 @@ def run_latest_pipeline(
         start_date=start,
         end_date=end,
         output_filename=output_filename,
+        cost_config=effective_cost,
     )
 
     return {
@@ -114,6 +122,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--start-date", default="2020-01-01")
     parser.add_argument("--end-date", default=date.today().isoformat())
     parser.add_argument("--output-filename", default="ranking.json")
+    parser.add_argument("--slippage-points", type=float, default=2.0)
+    parser.add_argument("--fee-money", type=float, default=0.0)
+    parser.add_argument("--tax-rate", type=float, default=0.00002)
+    parser.add_argument("--point-value", type=float, default=50.0)
+    parser.add_argument("--qty", type=int, default=1)
     args = parser.parse_args(argv)
 
     result = run_latest_pipeline(
@@ -121,6 +134,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         start_date=date.fromisoformat(args.start_date),
         end_date=date.fromisoformat(args.end_date),
         output_filename=args.output_filename,
+        cost_config=CostConfig(
+            slippage_points_per_side=args.slippage_points,
+            fee_money_per_side=args.fee_money,
+            tax_rate=args.tax_rate,
+            point_value=args.point_value,
+            qty=args.qty,
+        ),
     )
     print(
         json.dumps(

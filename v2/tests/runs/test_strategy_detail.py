@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from mqre_v2.backtest.costs import CostConfig
 from mqre_v2.runs.run_manager import RunManifest, create_run_directory, write_manifest
 from mqre_v2.runs.run_pipeline import run_pipeline_from_run
 
@@ -56,6 +57,10 @@ def _write_txt_rows(run_path: str, stem: str, rows: list[tuple]) -> None:
     )
 
 
+def _zero_cost() -> CostConfig:
+    return CostConfig(slippage_points_per_side=0.0, tax_rate=0.0)
+
+
 def test_strategy_detail_json_is_generated(tmp_path) -> None:
     run_path = _create_run(tmp_path)
     _write_xs(run_path, "alpha")
@@ -65,6 +70,7 @@ def test_strategy_detail_json_is_generated(tmp_path) -> None:
         run_path,
         start_date=date(2020, 1, 1),
         end_date=date(2023, 12, 31),
+        cost_config=_zero_cost(),
     )
 
     detail_path = Path(run_path) / "reports" / "details" / "alpha.json"
@@ -86,6 +92,7 @@ def test_each_strategy_has_detail_json(tmp_path) -> None:
         run_path,
         start_date=date(2020, 1, 1),
         end_date=date(2023, 12, 31),
+        cost_config=_zero_cost(),
     )
 
     details_dir = Path(run_path) / "reports" / "details"
@@ -104,6 +111,7 @@ def test_strategy_detail_equity_curve_uses_weekly_series(tmp_path) -> None:
         run_path,
         start_date=date(2020, 1, 1),
         end_date=date(2023, 12, 31),
+        cost_config=_zero_cost(),
     )
     payload = json.loads(
         (Path(run_path) / "reports" / "details" / "alpha.json").read_text(
@@ -126,6 +134,7 @@ def test_strategy_detail_kpi_fields_exist(tmp_path) -> None:
         run_path,
         start_date=date(2020, 1, 1),
         end_date=date(2023, 12, 31),
+        cost_config=_zero_cost(),
     )
     payload = json.loads(
         (Path(run_path) / "reports" / "details" / "alpha.json").read_text(
@@ -158,6 +167,7 @@ def test_strategy_detail_trade_stats_are_calculated(tmp_path) -> None:
         run_path,
         start_date=date(2020, 1, 1),
         end_date=date(2023, 12, 31),
+        cost_config=_zero_cost(),
     )
     payload = json.loads(
         (Path(run_path) / "reports" / "details" / "alpha.json").read_text(
@@ -196,3 +206,40 @@ def test_strategy_detail_trade_stats_are_calculated(tmp_path) -> None:
     assert stats["max_losing_streak"] == 2
     assert stats["underwater_weeks"] == 1
     assert stats["max_drawdown"] == 20.0
+
+
+def test_strategy_detail_contains_cost_and_net_pnl_fields(tmp_path) -> None:
+    run_path = _create_run(tmp_path)
+    _write_xs(run_path, "alpha")
+    _write_txt_rows(
+        run_path,
+        "alpha",
+        [
+            ("2023-03-01T09:00:00", "2023-03-01T09:05:00", "long", 100, 120),
+            ("2023-03-02T09:00:00", "2023-03-02T09:05:00", "long", 120, 115),
+        ],
+    )
+
+    run_pipeline_from_run(
+        run_path,
+        start_date=date(2020, 1, 1),
+        end_date=date(2023, 12, 31),
+        cost_config=CostConfig(slippage_points_per_side=2.0, tax_rate=0.0),
+    )
+    payload = json.loads(
+        (Path(run_path) / "reports" / "details" / "alpha.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert "cost" in payload
+    assert "cost_stress" in payload
+    assert payload["cost"]["round_trip_slippage_points"] == 4.0
+    assert payload["trade_stats"]["raw_total_profit"] == 15.0
+    assert payload["trade_stats"]["net_total_profit"] == 7.0
+    assert payload["trade_stats"]["total_slippage_cost"] == 8.0
+    assert payload["trade_stats"]["avg_net_pnl_per_trade"] == 3.5
+    assert payload["weekly_pnl"] == [{"week": "2023-W09", "pnl": 7.0}]
+    assert payload["equity_curve"] == [{"week": "2023-W09", "equity": 100007.0}]
+    assert payload["trades"][0]["raw_pnl"] == 20.0
+    assert payload["trades"][0]["net_pnl"] == 16.0

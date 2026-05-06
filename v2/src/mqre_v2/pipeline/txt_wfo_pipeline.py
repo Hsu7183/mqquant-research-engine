@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from mqre_v2.backtest.costs import CostConfig, trade_cost_breakdown
 from mqre_v2.io.txt_parser import parse_xs_txt
 from mqre_v2.validation.decision import score_wfo_summary
 from mqre_v2.validation.wfo import (
@@ -39,11 +40,14 @@ def run_txt_wfo_pipeline(
     gate_config: dict,
     txt_filenames: list[str] | None = None,
     include_wfo_details: bool = False,
+    cost_config: CostConfig | None = None,
+    strategy_quality: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict]:
     folder = Path(txt_folder)
     if not folder.is_dir():
         raise NotADirectoryError(f"txt_folder is not a directory: {folder}")
 
+    effective_cost = cost_config or CostConfig()
     allowed_names = None
     if txt_filenames is not None:
         allowed_names = {Path(filename).name for filename in txt_filenames}
@@ -57,19 +61,21 @@ def run_txt_wfo_pipeline(
 
         strategy_name = txt_path.stem
         try:
-            parse_xs_txt(txt_path.read_text(encoding="utf-8-sig"))
+            all_trades = parse_xs_txt(txt_path.read_text(encoding="utf-8-sig"))
             wfo_result = run_wfo(
                 start_date=start_date,
                 end_date=end_date,
                 strategy_name=strategy_name,
                 optimize_fn=default_optimize_fn,
                 evaluate_fn=build_txt_evaluate_fn(
-                    TxtWfoInput(strategy_name=strategy_name, txt_path=str(txt_path))
+                    TxtWfoInput(strategy_name=strategy_name, txt_path=str(txt_path)),
+                    cost_config=effective_cost,
                 ),
                 window_kwargs=_build_window_kwargs(gate_config),
                 gate_config=_build_gate_config(gate_config),
             )
             summary = wfo_result.summary
+            trade_totals = _build_trade_totals(all_trades, effective_cost)
             result = {
                 "rank": 0,
                 "strategy_name": strategy_name,
@@ -82,6 +88,23 @@ def run_txt_wfo_pipeline(
                 "passed": wfo_result.passed,
                 "fail_reason": wfo_result.fail_reason,
             }
+            result.update(trade_totals)
+            quality = (strategy_quality or {}).get(strategy_name, {})
+            result.update(
+                {
+                    key: value
+                    for key, value in quality.items()
+                    if key not in {"fail_reasons"}
+                }
+            )
+            fail_reasons = list(quality.get("fail_reasons", []))
+            if fail_reasons:
+                result["passed"] = False
+                result["fail_reason"] = _append_fail_reason(
+                    str(result.get("fail_reason", "")),
+                    fail_reasons,
+                )
+                result["score"] = 0.0
             if include_wfo_details:
                 result["summary"] = {
                     "total_rounds": summary.total_rounds,
@@ -183,6 +206,46 @@ def _failed_result(strategy_name: str, txt_path: Path, fail_reason: str) -> dict
         "passed": False,
         "fail_reason": fail_reason,
     }
+
+
+def _build_trade_totals(
+    trades: list,
+    cost_config: CostConfig | None,
+) -> dict[str, float]:
+    raw_total = sum(float(trade.pnl) for trade in trades)
+    if cost_config is None:
+        net_total = raw_total
+        slippage = 0.0
+        fee = 0.0
+        tax = 0.0
+        total_cost = 0.0
+    else:
+        breakdowns = [trade_cost_breakdown(trade, cost_config) for trade in trades]
+        net_total = sum(item["net_pnl"] for item in breakdowns)
+        slippage = sum(item["slippage_cost"] for item in breakdowns)
+        fee = sum(item["fee_cost"] for item in breakdowns)
+        tax = sum(item["tax_cost"] for item in breakdowns)
+        total_cost = sum(item["total_cost"] for item in breakdowns)
+
+    trade_count = len(trades)
+    trade_days = {trade.exit_time.date() for trade in trades}
+    avg_trades_per_day = trade_count / len(trade_days) if trade_days else 0.0
+    return {
+        "raw_total_profit": _safe_number(raw_total),
+        "net_total_profit": _safe_number(net_total),
+        "total_slippage_cost": _safe_number(slippage),
+        "total_fee_cost": _safe_number(fee),
+        "total_tax_cost": _safe_number(tax),
+        "total_cost": _safe_number(total_cost),
+        "avg_net_pnl_per_trade": _safe_number(net_total / trade_count if trade_count else 0.0),
+        "avg_trades_per_day": _safe_number(avg_trades_per_day),
+    }
+
+
+def _append_fail_reason(existing: str, reasons: list[str]) -> str:
+    parts = [part.strip() for part in existing.split(";") if part.strip()]
+    parts.extend(reason for reason in reasons if reason)
+    return "; ".join(parts)
 
 
 def _safe_number(value: float | int) -> float | str:

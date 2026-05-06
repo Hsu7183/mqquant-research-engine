@@ -7,12 +7,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from mqre_v2.backtest.costs import CostConfig, net_pnl_points_for_trade, trade_cost_breakdown
 from mqre_v2.core.trades import TradeRecord
 from mqre_v2.io.txt_parser import parse_xs_txt
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_manager import load_manifest, write_manifest
 from mqre_v2.runs.run_txt_validator import validate_run_txt
+from mqre_v2.validation.cost_stress import run_cost_stress
 
 STARTING_EQUITY = 100000.0
 
@@ -31,6 +33,7 @@ def run_pipeline_from_run(
     start_date: date,
     end_date: date,
     output_filename: str = "ranking.json",
+    cost_config: CostConfig | None = None,
 ) -> RunPipelineResult:
     validation = validate_run_txt(run_path)
     if len(validation.valid_txt) == 0:
@@ -39,6 +42,7 @@ def run_pipeline_from_run(
     manifest = load_manifest(run_path)
     root = Path(run_path)
     txt_folder = root / "txt"
+    effective_cost = cost_config or CostConfig()
     ranking = run_txt_wfo_pipeline(
         txt_folder=str(txt_folder),
         start_date=start_date,
@@ -46,11 +50,12 @@ def run_pipeline_from_run(
         gate_config={},
         txt_filenames=validation.valid_txt,
         include_wfo_details=True,
+        cost_config=effective_cost,
     )
 
     output_path = root / "reports" / output_filename
     report_rows = [_to_report_row(item) for item in ranking]
-    _write_strategy_detail_reports(root, manifest.run_id, ranking)
+    _write_strategy_detail_reports(root, manifest.run_id, ranking, effective_cost)
     export_json_report(
         _build_report_payload(manifest.run_id, report_rows),
         str(output_path),
@@ -114,7 +119,7 @@ def write_ranking_summary_detail_reports(ranking_report_path: str) -> list[str]:
 
 
 def _to_report_row(item: dict) -> dict:
-    return {
+    row = {
         "rank": int(item["rank"]),
         "strategy_name": str(item["strategy_name"]),
         "score": _as_float(item["score"]),
@@ -123,6 +128,23 @@ def _to_report_row(item: dict) -> dict:
         "max_test_mdd": _as_float(item["max_test_mdd"]),
         "average_test_pf": _as_float(item["average_test_pf"]),
     }
+    for key in [
+        "raw_total_profit",
+        "net_total_profit",
+        "total_slippage_cost",
+        "total_fee_cost",
+        "total_tax_cost",
+        "total_cost",
+        "avg_net_pnl_per_trade",
+        "avg_trades_per_day",
+    ]:
+        if key in item:
+            row[key] = _as_float(item[key])
+    if "passed" in item:
+        row["passed"] = bool(item["passed"])
+    if "fail_reason" in item:
+        row["fail_reason"] = str(item["fail_reason"])
+    return row
 
 
 def _build_ranking_summary_detail_payload(run_id: str, item: dict) -> dict:
@@ -160,7 +182,12 @@ def _build_ranking_summary_detail_payload(run_id: str, item: dict) -> dict:
     }
 
 
-def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict]) -> list[str]:
+def _write_strategy_detail_reports(
+    root: Path,
+    run_id: str,
+    ranking: list[dict],
+    cost_config: CostConfig | None = None,
+) -> list[str]:
     details_dir = root / "reports" / "details"
     details_dir.mkdir(parents=True, exist_ok=True)
 
@@ -169,12 +196,13 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
         trades = parse_xs_txt(
             Path(str(item["txt_path"])).read_text(encoding="utf-8-sig")
         )
-        weekly_series = build_weekly_series(trades)
+        weekly_series = build_weekly_series(trades, cost_config=cost_config)
         payload = _build_strategy_detail_payload(
             run_id,
             item,
             trades=trades,
             weekly_series=weekly_series,
+            cost_config=cost_config,
         )
         detail_path = details_dir / f"{payload['strategy_name']}.json"
         detail_path.write_text(
@@ -191,12 +219,18 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
     return written_paths
 
 
-def build_weekly_series(trades: list[TradeRecord]) -> dict:
+def build_weekly_series(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None = None,
+) -> dict:
     weekly_totals: dict[str, float] = {}
     for trade in trades:
         iso_year, iso_week, _ = trade.exit_time.date().isocalendar()
         week_key = f"{iso_year}-W{iso_week:02d}"
-        weekly_totals[week_key] = weekly_totals.get(week_key, 0.0) + float(trade.pnl)
+        weekly_totals[week_key] = weekly_totals.get(week_key, 0.0) + _trade_pnl(
+            trade,
+            cost_config,
+        )
 
     equity = STARTING_EQUITY
     equity_curve = []
@@ -222,7 +256,11 @@ def build_trade_period(trades: list[TradeRecord]) -> dict[str, str]:
     return {"start": start, "end": end}
 
 
-def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
+def build_trade_stats(
+    trades: list[TradeRecord],
+    weekly_series: dict,
+    cost_config: CostConfig | None = None,
+) -> dict:
     trade_count = len(trades)
     if trade_count == 0:
         return {
@@ -245,9 +283,19 @@ def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
             "max_drawdown": 0.0,
             "underwater_weeks": 0,
             "max_losing_streak": 0,
+            "raw_total_profit": 0.0,
+            "net_total_profit": 0.0,
+            "total_slippage_cost": 0.0,
+            "total_fee_cost": 0.0,
+            "total_tax_cost": 0.0,
+            "total_cost": 0.0,
+            "avg_cost_per_trade": 0.0,
+            "avg_net_pnl_per_trade": 0.0,
         }
 
-    pnls = [float(trade.pnl) for trade in trades]
+    raw_pnls = [float(trade.pnl) for trade in trades]
+    cost_rows = [_trade_cost_row(trade, cost_config) for trade in trades]
+    pnls = [row["net_pnl"] for row in cost_rows]
     wins = [pnl for pnl in pnls if pnl > 0]
     losses = [pnl for pnl in pnls if pnl < 0]
     gross_profit = sum(wins)
@@ -257,6 +305,8 @@ def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
     max_drawdown, underwater_weeks = _compute_weekly_risk(
         weekly_series.get("equity_curve", [])
     )
+    total_cost = sum(row["total_cost"] for row in cost_rows)
+    net_total_profit = sum(pnls)
 
     return {
         "trade_count": trade_count,
@@ -265,8 +315,8 @@ def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
         "win_count": len(wins),
         "loss_count": len(losses),
         "win_rate": len(wins) / trade_count,
-        "total_profit": sum(pnls),
-        "avg_trade_pnl": sum(pnls) / trade_count,
+        "total_profit": net_total_profit,
+        "avg_trade_pnl": net_total_profit / trade_count,
         "avg_win": avg_win,
         "avg_loss": avg_loss,
         "largest_win": max(wins) if wins else 0.0,
@@ -277,7 +327,15 @@ def build_trade_stats(trades: list[TradeRecord], weekly_series: dict) -> dict:
         "payoff_ratio": _ratio_or_inf(avg_win, avg_loss),
         "max_drawdown": max_drawdown,
         "underwater_weeks": underwater_weeks,
-        "max_losing_streak": _max_losing_streak(trades),
+        "max_losing_streak": _max_losing_streak(pnls),
+        "raw_total_profit": sum(raw_pnls),
+        "net_total_profit": net_total_profit,
+        "total_slippage_cost": sum(row["slippage_cost"] for row in cost_rows),
+        "total_fee_cost": sum(row["fee_cost"] for row in cost_rows),
+        "total_tax_cost": sum(row["tax_cost"] for row in cost_rows),
+        "total_cost": total_cost,
+        "avg_cost_per_trade": total_cost / trade_count,
+        "avg_net_pnl_per_trade": net_total_profit / trade_count,
     }
 
 
@@ -286,6 +344,7 @@ def _build_strategy_detail_payload(
     item: dict,
     trades: list[TradeRecord],
     weekly_series: dict,
+    cost_config: CostConfig | None = None,
 ) -> dict:
     period_pnl = []
     equity = 0.0
@@ -301,24 +360,35 @@ def _build_strategy_detail_payload(
     max_mdd = _as_float(item["max_test_mdd"])
     average_pf = _as_float(item["average_test_pf"])
 
+    trade_stats = build_trade_stats(trades, weekly_series, cost_config=cost_config)
+    cost_summary = build_cost_summary(trades, cost_config)
+
     return {
         "strategy_name": str(item["strategy_name"]),
         "run_id": run_id,
         "summary": {
             "score": score,
             "total_test_net_profit": total_profit,
+            "raw_total_profit": _as_float(item.get("raw_total_profit", trade_stats["raw_total_profit"])),
+            "net_total_profit": _as_float(item.get("net_total_profit", trade_stats["net_total_profit"])),
             "pass_rate": pass_rate,
             "max_test_mdd": max_mdd,
             "average_test_pf": average_pf,
         },
         "period": build_trade_period(trades),
-        "trade_stats": build_trade_stats(trades, weekly_series),
+        "trade_stats": trade_stats,
+        "cost": cost_summary,
+        "cost_stress": run_cost_stress(
+            trades,
+            cost_config or CostConfig(slippage_points_per_side=0.0, tax_rate=0.0),
+        )["scenarios"],
+        "trades": build_trade_cost_records(trades, cost_config),
         "equity_curve": weekly_series["equity_curve"],
         "weekly_pnl": weekly_series["weekly_pnl"],
         "period_pnl": period_pnl,
         "kpi": {
             "score": score,
-            "profit": total_profit,
+            "profit": trade_stats["net_total_profit"],
             "pass_rate": pass_rate,
             "mdd": max_mdd,
             "pf": average_pf,
@@ -332,11 +402,107 @@ def _ratio_or_inf(numerator: float, denominator: float) -> float:
     return numerator / denominator
 
 
-def _max_losing_streak(trades: list[TradeRecord]) -> int:
+def build_cost_summary(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None = None,
+) -> dict[str, float | int]:
+    if cost_config is None:
+        trade_count = len(trades)
+        return {
+            "slippage_points_per_side": 0.0,
+            "round_trip_slippage_points": 0.0,
+            "fee_money_per_side": 0.0,
+            "round_trip_fee_money": 0.0,
+            "fee_points_round_trip": 0.0,
+            "tax_rate": 0.0,
+            "point_value": 0.0,
+            "qty": 0,
+            "total_slippage_cost_points": 0.0,
+            "total_fee_cost_points": 0.0,
+            "total_tax_cost_points": 0.0,
+            "total_cost_points": 0.0,
+            "avg_cost_per_trade_points": 0.0 if trade_count else 0.0,
+        }
+
+    rows = [_trade_cost_row(trade, cost_config) for trade in trades]
+    total_slippage = sum(row["slippage_cost"] for row in rows)
+    total_fee = sum(row["fee_cost"] for row in rows)
+    total_tax = sum(row["tax_cost"] for row in rows)
+    total_cost = sum(row["total_cost"] for row in rows)
+    trade_count = len(trades)
+    return {
+        "slippage_points_per_side": float(cost_config.slippage_points_per_side),
+        "round_trip_slippage_points": float(cost_config.slippage_points_per_side) * 2.0,
+        "fee_money_per_side": float(cost_config.fee_money_per_side),
+        "round_trip_fee_money": float(cost_config.fee_money_per_side) * 2.0,
+        "fee_points_round_trip": (
+            float(cost_config.fee_money_per_side) * 2.0 / float(cost_config.point_value)
+        ),
+        "tax_rate": float(cost_config.tax_rate),
+        "point_value": float(cost_config.point_value),
+        "qty": int(cost_config.qty),
+        "total_slippage_cost_points": total_slippage,
+        "total_fee_cost_points": total_fee,
+        "total_tax_cost_points": total_tax,
+        "total_cost_points": total_cost,
+        "avg_cost_per_trade_points": total_cost / trade_count if trade_count else 0.0,
+    }
+
+
+def build_trade_cost_records(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None = None,
+) -> list[dict]:
+    records = []
+    for index, trade in enumerate(trades, start=1):
+        row = _trade_cost_row(trade, cost_config)
+        records.append(
+            {
+                "index": index,
+                "entry_time": trade.entry_time.isoformat(),
+                "exit_time": trade.exit_time.isoformat(),
+                "direction": trade.direction,
+                "entry_price": trade.entry_price,
+                "exit_price": trade.exit_price,
+                "raw_pnl": row["raw_pnl"],
+                "net_pnl": row["net_pnl"],
+                "slippage_cost": row["slippage_cost"],
+                "fee_cost": row["fee_cost"],
+                "tax_cost": row["tax_cost"],
+                "total_cost": row["total_cost"],
+            }
+        )
+    return records
+
+
+def _trade_pnl(trade: TradeRecord, cost_config: CostConfig | None) -> float:
+    if cost_config is None:
+        return float(trade.pnl)
+    return net_pnl_points_for_trade(trade, cost_config)
+
+
+def _trade_cost_row(
+    trade: TradeRecord,
+    cost_config: CostConfig | None,
+) -> dict[str, float]:
+    if cost_config is None:
+        raw_pnl = float(trade.pnl)
+        return {
+            "raw_pnl": raw_pnl,
+            "net_pnl": raw_pnl,
+            "slippage_cost": 0.0,
+            "fee_cost": 0.0,
+            "tax_cost": 0.0,
+            "total_cost": 0.0,
+        }
+    return trade_cost_breakdown(trade, cost_config)
+
+
+def _max_losing_streak(pnl_values: list[float]) -> int:
     current = 0
     max_streak = 0
-    for trade in sorted(trades, key=lambda item: (item.exit_time, item.entry_time)):
-        if trade.pnl < 0:
+    for pnl in pnl_values:
+        if pnl < 0:
             current += 1
             max_streak = max(max_streak, current)
         else:

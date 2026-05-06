@@ -9,7 +9,14 @@ python -m mqre_v2.cli.run_strategy_search ^
   --num-strategies 300 ^
   --seed 42 ^
   --start-date 2020-01-01 ^
-  --end-date 2026-12-31
+  --end-date 2026-12-31 ^
+  --slippage-points 2 ^
+  --fee-money 0 ^
+  --tax-rate 0.00002 ^
+  --point-value 50 ^
+  --qty 1 ^
+  --min-net-profit-per-trade 0 ^
+  --max-trades-per-day 999999
 
 echo Step 2: Git commit
 git add runs/latest reports

@@ -459,10 +459,10 @@
               <thead>
                 <tr>
                   <th>排名</th>
-                  <th>策略名稱</th>
                   <th>策略族群</th>
+                  <th>策略代號</th>
                   <th>分數</th>
-                  <th>總獲利</th>
+                  <th>扣成本後總損益</th>
                   <th>通過率</th>
                   <th>最大回撤</th>
                   <th>PF</th>
@@ -482,7 +482,7 @@
             </div>
           </div>
           <div class="panel chart-card">
-            <h2>Top10 獲利</h2>
+            <h2>Top10 扣成本後損益</h2>
             <div class="chart-box">
               <canvas id="profit-chart"></canvas>
             </div>
@@ -505,7 +505,7 @@
               <div id="detail-score" class="meta-value">-</div>
             </div>
             <div class="summary-card">
-              <div class="meta-label">總獲利</div>
+              <div class="meta-label">扣成本後總損益</div>
               <div id="detail-profit" class="meta-value">-</div>
             </div>
             <div class="summary-card">
@@ -565,6 +565,24 @@
                 </tr>
               </thead>
               <tbody id="detail-kpi-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>成本壓力測試</h2>
+          <div class="table-wrap">
+            <table class="kpi-table">
+              <thead>
+                <tr>
+                  <th>單邊滑點</th>
+                  <th>總淨利</th>
+                  <th>PF</th>
+                  <th>最大回撤</th>
+                  <th>是否通過</th>
+                </tr>
+              </thead>
+              <tbody id="detail-cost-stress-body"></tbody>
             </table>
           </div>
         </section>

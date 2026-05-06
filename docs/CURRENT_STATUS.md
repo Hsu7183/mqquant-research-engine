@@ -38,6 +38,7 @@ Reason:
 - M1 OHLC TXT Parser
 - M1 Backtest MVP
 - Intraday Futures Strategy Generator
+- Full Futures Trading Cost Model
 - L1-L4 Pipeline CLI
 - WFO Window Generator
 - WFO Result Schema
@@ -123,6 +124,20 @@ M1 行情資料
 - 1001plus+ 只是技術元件參考
 - SimpleM1Strategy 是 MVP 策略邏輯
 - 下一步才會替換為正式 0313 / 1001 / 0807 策略邏輯
+
+## Cost Model
+
+Ranking、WFO、weekly_pnl、equity_curve、strategy_detail KPI 與 dashboard 目前皆採扣成本後績效。
+
+預設成本：
+
+- 小台每點價值 `point_value = 50`
+- 單邊滑點 `slippage_points_per_side = 2`
+- 期交稅率 `tax_rate = 0.00002`
+- 單邊手續費 `fee_money_per_side = 0`，可用 `--fee-money` 指定
+- 口數 `qty = 1`
+
+短線 1 分 K 策略必須檢查成本壓力測試。detail JSON 會輸出 raw pnl、net pnl、滑點、手續費、期交稅、總成本與不同滑點情境的壓力測試結果。
 
 ## Next Direction
 

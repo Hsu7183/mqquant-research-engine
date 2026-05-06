@@ -28,7 +28,8 @@ def test_run_strategy_search_cli_outputs_family_summary(tmp_path, monkeypatch, c
         ]
     )
 
-    payload = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
 
     assert exit_code == 0
     assert payload["generated_count"] == 12
@@ -37,6 +38,8 @@ def test_run_strategy_search_cli_outputs_family_summary(tmp_path, monkeypatch, c
     assert payload["ranking_json"] == str(Path("runs") / "latest" / "reports" / "ranking.json")
     assert payload["family_counts"]
     assert "best_family" in payload
+    assert payload["cost"]["slippage_points_per_side"] == 2.0
+    assert "策略搜尋完成" in captured.err
     assert len(payload["top_5"]) <= 5
     assert list((tmp_path / "runs" / "latest" / "txt").glob("*.txt"))
 

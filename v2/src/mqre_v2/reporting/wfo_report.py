@@ -43,7 +43,7 @@ def validate_report_schema(data: dict) -> bool:
         return False
 
     required_root = {"run_id", "generated_at", "summary", "top_10", "all_results"}
-    if set(data) != required_root:
+    if not required_root <= set(data):
         return False
     if not isinstance(data["run_id"], str):
         return False
@@ -89,7 +89,7 @@ def _valid_summary(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     required = {"total_strategies", "valid_strategies"}
-    if set(value) != required:
+    if not required <= set(value):
         return False
     return _is_int(value["total_strategies"]) and _is_int(value["valid_strategies"])
 
@@ -107,7 +107,7 @@ def _valid_ranking_item(value: Any) -> bool:
         "max_test_mdd",
         "average_test_pf",
     }
-    if set(value) != required:
+    if not required <= set(value):
         return False
     if not _is_int(value["rank"]):
         return False
