@@ -12,8 +12,13 @@ env/
 
 # Logs and run outputs
 *.log
+worker.stdout*
+worker.stderr*
 logs/
 run_history/
+**/mq01_jobs/
+**/run_history/jobs/
+**/bundle/run_history/mq01_jobs/
 runs/*
 !runs/latest/
 runs/latest/*
@@ -26,6 +31,9 @@ temp/
 # Data storage (large / generated)
 /M1.txt
 /m1.txt
+/01-01/bundle/data/
+/01-01-01/bundle/data/
+/legacy_archive/01-01-01/bundle/data/
 data/raw/
 data/archive/
 data/processed/
@@ -45,6 +53,14 @@ secrets/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local legacy drops are reference material, not maintained v2 source.
+/01-01/
+/01-01-01/
+/legacy_archive/_deprecated_01-01/
+/legacy_archive/01-01-01/**
+!/legacy_archive/01-01-01/
+!/legacy_archive/01-01-01/README.md
 
 # Keep v2 runs package code trackable
 !v2/src/mqre_v2/runs/
