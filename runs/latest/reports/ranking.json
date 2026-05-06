@@ -1,66 +1,30 @@
 {
   "run_id": "latest",
-  "generated_at": "2026-05-06T00:00:00+00:00",
   "summary": {
-    "total_strategies": 3,
-    "valid_strategies": 3
+    "total_strategies": 1,
+    "valid_strategies": 1
   },
   "top_10": [
     {
       "rank": 1,
-      "strategy_name": "0313plus_EB2_DB1_ATRS1p5_ATRTP2_TS20_IDX7",
-      "score": 93.52,
-      "total_test_net_profit": 128000,
-      "pass_rate": 0.83,
-      "max_test_mdd": 8700,
-      "average_test_pf": 1.72
-    },
-    {
-      "rank": 2,
-      "strategy_name": "0313plus_EB1_DB1_ATRS1p5_ATRTP2_TS20_IDX4",
-      "score": 90.18,
-      "total_test_net_profit": 119500,
-      "pass_rate": 0.78,
-      "max_test_mdd": 9100,
-      "average_test_pf": 1.65
-    },
-    {
-      "rank": 3,
-      "strategy_name": "0313plus_EB2_DB2_ATRS2_ATRTP2p5_TS30_IDX11",
-      "score": 88.41,
-      "total_test_net_profit": 113200,
-      "pass_rate": 0.72,
-      "max_test_mdd": 8200,
-      "average_test_pf": 1.61
+      "strategy_name": "auto_demo",
+      "score": 102.63349727308122,
+      "total_test_net_profit": 2427.0,
+      "pass_rate": 0.3333333333333333,
+      "max_test_mdd": 2147.0,
+      "average_test_pf": 1.016559908462067
     }
   ],
   "all_results": [
     {
       "rank": 1,
-      "strategy_name": "0313plus_EB2_DB1_ATRS1p5_ATRTP2_TS20_IDX7",
-      "score": 93.52,
-      "total_test_net_profit": 128000,
-      "pass_rate": 0.83,
-      "max_test_mdd": 8700,
-      "average_test_pf": 1.72
-    },
-    {
-      "rank": 2,
-      "strategy_name": "0313plus_EB1_DB1_ATRS1p5_ATRTP2_TS20_IDX4",
-      "score": 90.18,
-      "total_test_net_profit": 119500,
-      "pass_rate": 0.78,
-      "max_test_mdd": 9100,
-      "average_test_pf": 1.65
-    },
-    {
-      "rank": 3,
-      "strategy_name": "0313plus_EB2_DB2_ATRS2_ATRTP2p5_TS30_IDX11",
-      "score": 88.41,
-      "total_test_net_profit": 113200,
-      "pass_rate": 0.72,
-      "max_test_mdd": 8200,
-      "average_test_pf": 1.61
+      "strategy_name": "auto_demo",
+      "score": 102.63349727308122,
+      "total_test_net_profit": 2427.0,
+      "pass_rate": 0.3333333333333333,
+      "max_test_mdd": 2147.0,
+      "average_test_pf": 1.016559908462067
     }
-  ]
+  ],
+  "generated_at": "2026-05-06T13:07:09.852705+00:00"
 }
