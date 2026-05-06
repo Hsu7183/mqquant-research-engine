@@ -9,6 +9,7 @@ from typing import Any
 
 from mqre_v2.backtest.costs import CostConfig, net_pnl_points_for_trade, trade_cost_breakdown
 from mqre_v2.core.trades import TradeRecord
+from mqre_v2.export.artifact_exporter import export_latest_run
 from mqre_v2.io.txt_parser import parse_xs_txt
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
@@ -56,6 +57,12 @@ def run_pipeline_from_run(
     output_path = root / "reports" / output_filename
     report_rows = [_to_report_row(item) for item in ranking]
     _write_strategy_detail_reports(root, manifest.run_id, ranking, effective_cost)
+    export_dashboard_artifacts_from_ranking(
+        root=root,
+        run_id=manifest.run_id,
+        ranking=ranking,
+        cost_config=effective_cost,
+    )
     export_json_report(
         _build_report_payload(manifest.run_id, report_rows),
         str(output_path),
@@ -76,6 +83,44 @@ def run_pipeline_from_run(
         ranking=ranking,
         output_json_path=str(output_path),
     )
+
+
+def export_dashboard_artifacts_from_ranking(
+    root: Path,
+    run_id: str,
+    ranking: list[dict],
+    cost_config: CostConfig | None = None,
+) -> list[str]:
+    top_item = ranking[0] if ranking else {}
+    trades = _read_artifact_trades(top_item)
+    artifact_result: dict[str, Any] = {
+        "ranking": ranking,
+        "strategy_detail": _build_dashboard_strategy_detail(
+            top_item,
+            trades=trades,
+            cost_config=cost_config,
+        ),
+        "wfo_summary": _build_dashboard_wfo_summary(top_item),
+        "risk_report": _build_dashboard_risk_report(top_item, trades, cost_config),
+        "decision_audit": {
+            "baseline_strategy": f"{run_id}_baseline",
+            "challenger_strategy": str(
+                top_item.get("strategy_name")
+                or top_item.get("strategy_id")
+                or "1001plus_candidate"
+            ),
+            "promotion_decision": "review_required",
+            "reason": "pipeline completed; dashboard artifacts exported for human review",
+        },
+    }
+    if trades:
+        artifact_result["trades"] = _build_dashboard_trade_rows(trades, cost_config)
+        artifact_result["equity_curve"] = _build_dashboard_equity_curve(
+            trades,
+            cost_config,
+        )
+
+    return export_latest_run(artifact_result, output_dir=str(root))
 
 
 def _build_report_payload(run_id: str, ranking: list[dict]) -> dict:
@@ -180,6 +225,204 @@ def _build_ranking_summary_detail_payload(run_id: str, item: dict) -> dict:
             "pf": average_pf,
         },
     }
+
+
+def _read_artifact_trades(item: dict) -> list[TradeRecord]:
+    txt_path = item.get("txt_path")
+    if not txt_path:
+        return []
+    try:
+        return parse_xs_txt(Path(str(txt_path)).read_text(encoding="utf-8-sig"))
+    except Exception:
+        return []
+
+
+def _build_dashboard_strategy_detail(
+    item: dict,
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None,
+) -> dict:
+    strategy_id = str(
+        item.get("strategy_id")
+        or item.get("strategy_name")
+        or "1001plus_candidate"
+    )
+    weekly_series = build_weekly_series(trades, cost_config=cost_config)
+    trade_stats = build_trade_stats(
+        trades,
+        weekly_series=weekly_series,
+        cost_config=cost_config,
+    )
+    net_profit = _as_float(
+        item.get(
+            "net_total_profit",
+            item.get("total_test_net_profit", trade_stats["net_total_profit"]),
+        )
+    )
+    trade_count = int(trade_stats["trade_count"]) if trades else int(
+        _as_float(item.get("total_test_trade_count", 0.0))
+    )
+    return {
+        "strategy_id": strategy_id,
+        "params": {
+            "source": "v2_pipeline",
+            "txt_path": str(item.get("txt_path", "")),
+        },
+        "performance": {
+            "return": net_profit / STARTING_EQUITY,
+            "annual_return": net_profit / STARTING_EQUITY,
+            "sharpe": _as_float(item.get("average_test_pf", 0.0)),
+            "mdd": _as_float(item.get("max_test_mdd", trade_stats["max_drawdown"])),
+            "win_rate": _as_float(trade_stats["win_rate"]),
+            "profit_factor": _as_float(item.get("average_test_pf", trade_stats["profit_factor"])),
+            "trade_count": trade_count,
+            "average_trade_pnl": _as_float(
+                item.get("avg_net_pnl_per_trade", trade_stats["avg_net_pnl_per_trade"])
+            ),
+            "net_total_profit": net_profit,
+            "raw_total_profit": _as_float(
+                item.get("raw_total_profit", trade_stats["raw_total_profit"])
+            ),
+        },
+        "cost_model": _dashboard_cost_model(cost_config, trade_stats),
+        "entry_logic_summary": "Exported from v2 pipeline Trade TXT results.",
+        "exit_logic_summary": "Exported from completed TradeRecord exits; strategy logic remains upstream.",
+        "tags": ["1001plus", "v2_pipeline"],
+    }
+
+
+def _build_dashboard_trade_rows(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None,
+) -> list[dict]:
+    rows: list[dict] = []
+    cumulative = 0.0
+    for trade in sorted(trades, key=lambda item: item.exit_time):
+        pnl = _trade_pnl(trade, cost_config)
+        cumulative += pnl
+        rows.append(
+            {
+                "datetime": trade.exit_time,
+                "price": trade.exit_price,
+                "side": "buy" if trade.direction == 1 else "sell",
+                "pnl": pnl,
+                "cumulative_pnl": cumulative,
+            }
+        )
+    return rows
+
+
+def _build_dashboard_equity_curve(
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None,
+) -> list[dict]:
+    rows: list[dict] = []
+    equity = STARTING_EQUITY
+    peak = equity
+    for trade in sorted(trades, key=lambda item: item.exit_time):
+        equity += _trade_pnl(trade, cost_config)
+        peak = max(peak, equity)
+        rows.append(
+            {
+                "datetime": trade.exit_time,
+                "equity": equity,
+                "drawdown": max(0.0, peak - equity),
+            }
+        )
+    return rows
+
+
+def _build_dashboard_wfo_summary(item: dict) -> dict:
+    rounds = item.get("round_results", [])
+    if not isinstance(rounds, list):
+        rounds = []
+    return {
+        "rounds": [
+            {
+                "round_id": round_item.get("round_id", index),
+                "sharpe": _as_float(round_item.get("test_pf", 0.0)),
+                "return": _as_float(round_item.get("test_net_profit", 0.0)) / STARTING_EQUITY,
+                "max_drawdown": _as_float(round_item.get("test_mdd", 0.0)),
+                "trade_count": int(_as_float(round_item.get("test_trade_count", 0.0))),
+                "passed": bool(round_item.get("pass_flag", False)),
+            }
+            for index, round_item in enumerate(rounds, start=1)
+            if isinstance(round_item, dict)
+        ],
+        "avg_sharpe": _as_float(item.get("average_test_pf", 0.0)),
+        "pass_rate": _as_float(item.get("pass_rate", 0.0)),
+        "stability_score": _as_float(item.get("pass_rate", 0.0)),
+    }
+
+
+def _build_dashboard_risk_report(
+    item: dict,
+    trades: list[TradeRecord],
+    cost_config: CostConfig | None,
+) -> dict:
+    equity_curve = _build_dashboard_equity_curve(trades, cost_config)
+    max_drawdown = _as_float(item.get("max_test_mdd", 0.0))
+    if equity_curve:
+        max_drawdown = max(_as_float(row["drawdown"]) for row in equity_curve)
+    return {
+        "max_dd": max_drawdown,
+        "ulcer_index": _compute_ulcer_index(equity_curve),
+        "recovery_days": _compute_recovery_days(equity_curve),
+        "volatility": 0.0,
+        "downside_volatility": 0.0,
+    }
+
+
+def _dashboard_cost_model(
+    cost_config: CostConfig | None,
+    trade_stats: dict,
+) -> dict:
+    if cost_config is None:
+        return {
+            "slippage_points_per_side": 0.0,
+            "fee_money_per_side": 0.0,
+            "tax_rate": 0.0,
+            "point_value": 0.0,
+            "qty": 0,
+            "total_cost": _as_float(trade_stats.get("total_cost", 0.0)),
+        }
+    return {
+        "slippage_points_per_side": cost_config.slippage_points_per_side,
+        "fee_money_per_side": cost_config.fee_money_per_side,
+        "tax_rate": cost_config.tax_rate,
+        "point_value": cost_config.point_value,
+        "qty": cost_config.qty,
+        "total_cost": _as_float(trade_stats.get("total_cost", 0.0)),
+        "avg_cost_per_trade": _as_float(trade_stats.get("avg_cost_per_trade", 0.0)),
+    }
+
+
+def _compute_ulcer_index(equity_curve: list[dict]) -> float:
+    if not equity_curve:
+        return 0.0
+    peak = STARTING_EQUITY
+    squared_drawdowns = []
+    for row in equity_curve:
+        equity = _as_float(row.get("equity", STARTING_EQUITY))
+        peak = max(peak, equity)
+        drawdown_pct = ((peak - equity) / peak) * 100.0 if peak else 0.0
+        squared_drawdowns.append(drawdown_pct * drawdown_pct)
+    return math.sqrt(sum(squared_drawdowns) / len(squared_drawdowns))
+
+
+def _compute_recovery_days(equity_curve: list[dict]) -> int:
+    longest = 0
+    current = 0
+    peak = STARTING_EQUITY
+    for row in equity_curve:
+        equity = _as_float(row.get("equity", STARTING_EQUITY))
+        if equity >= peak:
+            peak = equity
+            current = 0
+        else:
+            current += 1
+            longest = max(longest, current)
+    return longest
 
 
 def _write_strategy_detail_reports(

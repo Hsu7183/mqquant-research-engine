@@ -13,6 +13,7 @@ from mqre_v2.runs.run_pipeline import (
     _build_report_payload,
     _to_report_row,
     _write_strategy_detail_reports,
+    export_dashboard_artifacts_from_ranking,
     run_pipeline_from_run,
     write_ranking_summary_detail_reports,
 )
@@ -64,6 +65,12 @@ def run_latest_pipeline(
                 ranking,
                 effective_cost,
             )
+            artifact_paths = export_dashboard_artifacts_from_ranking(
+                root=Path(run_path),
+                run_id=Path(run_path).name,
+                ranking=ranking,
+                cost_config=effective_cost,
+            )
             export_json_report(
                 _build_report_payload(Path(run_path).name, report_rows),
                 str(ranking_path),
@@ -75,6 +82,7 @@ def run_latest_pipeline(
                 "valid_txt": len(ranking),
                 "output_json_path": str(ranking_path),
                 "detail_json_count": len(detail_paths),
+                "artifact_count": len(artifact_paths),
                 "details_generated_from": "txt",
                 "top_10": ranking[:10],
             }
@@ -87,6 +95,13 @@ def run_latest_pipeline(
 
         detail_paths = write_ranking_summary_detail_reports(str(ranking_path))
         report = json.loads(ranking_path.read_text(encoding="utf-8"))
+        ranking = report.get("all_results", []) or report.get("top_10", [])
+        artifact_paths = export_dashboard_artifacts_from_ranking(
+            root=Path(run_path),
+            run_id=str(report.get("run_id", Path(run_path).name)),
+            ranking=ranking,
+            cost_config=effective_cost,
+        )
         return {
             "run_id": report.get("run_id", Path(run_path).name),
             "run_path": run_path,
@@ -94,6 +109,7 @@ def run_latest_pipeline(
             "valid_txt": 0,
             "output_json_path": str(ranking_path),
             "detail_json_count": len(detail_paths),
+            "artifact_count": len(artifact_paths),
             "details_generated_from": "ranking_summary",
             "top_10": report.get("top_10", []),
         }
@@ -112,6 +128,7 @@ def run_latest_pipeline(
         "total_strategies": result.total_strategies,
         "valid_txt": result.valid_txt,
         "output_json_path": result.output_json_path,
+        "artifact_count": 9,
         "top_10": result.ranking[:10],
     }
 

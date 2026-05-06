@@ -90,6 +90,40 @@ def test_run_pipeline_from_run_writes_json_report(tmp_path) -> None:
     assert validate_report_schema(payload) is True
 
 
+def test_run_pipeline_from_run_exports_dashboard_artifacts(tmp_path) -> None:
+    run_path = _create_run(tmp_path)
+    _write_xs(run_path, "alpha")
+    _write_txt(run_path, "alpha", 100, 120)
+
+    run_pipeline_from_run(
+        run_path,
+        start_date=date(2020, 1, 1),
+        end_date=date(2023, 12, 31),
+    )
+
+    root = Path(run_path)
+    expected = {
+        "ranking.json",
+        "strategy_detail.json",
+        "equity_curve.csv",
+        "trades.csv",
+        "oos_summary.json",
+        "wfo_summary.json",
+        "risk_report.json",
+        "forward_log.csv",
+        "decision_audit.json",
+    }
+    assert expected <= {path.name for path in root.iterdir() if path.is_file()}
+
+    artifact_ranking = json.loads((root / "ranking.json").read_text(encoding="utf-8"))
+    detail = json.loads((root / "strategy_detail.json").read_text(encoding="utf-8"))
+    assert artifact_ranking[0]["strategy_id"] == "alpha"
+    assert detail["strategy_id"] == "alpha"
+    assert (root / "equity_curve.csv").read_text(encoding="utf-8").startswith(
+        "datetime,equity,drawdown"
+    )
+
+
 def test_run_pipeline_from_run_updates_manifest(tmp_path) -> None:
     run_path = _create_run(tmp_path)
     _write_xs(run_path, "alpha")
