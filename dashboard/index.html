@@ -3,600 +3,158 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>入口</title>
-    <style>
-      :root {
-        color-scheme: light;
-        --bg: #f6f7fb;
-        --card: #ffffff;
-        --text: #1f2937;
-        --muted: #6b7280;
-        --line: #e5e7eb;
-        --soft: #f9fafb;
-        --primary: #2563eb;
-        --primary-dark: #1e40af;
-        --danger: #b42318;
-        --strong: #d32f2f;
-        --watch: #c97706;
-        --weak: #6b7280;
-        --profit: #10b981;
-        --shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-        --radius: 14px;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        min-height: 100%;
-        user-select: none;
-      }
-
-      body {
-        background: linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
-        color: var(--text);
-        font:
-          14px/1.5 system-ui,
-          -apple-system,
-          "Segoe UI",
-          "PingFang TC",
-          "Noto Sans TC",
-          "Microsoft JhengHei",
-          sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      button,
-      input {
-        font: inherit;
-      }
-
-      img,
-      a {
-        -webkit-user-drag: none;
-      }
-
-      .hidden {
-        display: none !important;
-      }
-
-      .gate-page {
-        align-items: center;
-        display: flex;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 24px;
-      }
-
-      .gate-card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        max-width: 360px;
-        padding: 26px;
-        width: 100%;
-      }
-
-      .gate-card input {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        display: block;
-        outline: none;
-        padding: 13px 14px;
-        text-align: center;
-        width: 100%;
-      }
-
-      .gate-card input:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-      }
-
-      .btn {
-        align-items: center;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        cursor: pointer;
-        display: inline-flex;
-        font-weight: 700;
-        justify-content: center;
-        min-height: 40px;
-        padding: 8px 13px;
-        transition:
-          background 0.16s ease,
-          border-color 0.16s ease,
-          transform 0.16s ease;
-      }
-
-      .btn:hover {
-        transform: translateY(-1px);
-      }
-
-      .btn.primary {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: #ffffff;
-      }
-
-      .btn.primary:hover {
-        background: var(--primary-dark);
-      }
-
-      .btn.secondary {
-        background: #f3f4f6;
-        color: #374151;
-      }
-
-      .btn.link {
-        background: #eff6ff;
-        border-color: #bfdbfe;
-        color: var(--primary);
-        min-height: 34px;
-        padding: 6px 11px;
-      }
-
-      .gate-card .btn {
-        margin-top: 12px;
-        width: 100%;
-      }
-
-      .error-message {
-        color: var(--danger);
-        font-size: 13px;
-        font-weight: 700;
-        min-height: 22px;
-        margin: 12px 0 0;
-        text-align: center;
-      }
-
-      .app-shell {
-        margin: 0 auto;
-        max-width: 1180px;
-        padding: 20px 16px 40px;
-      }
-
-      .panel,
-      .hero-card,
-      .kpi-card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-      }
-
-      .hero-card {
-        padding: 20px;
-      }
-
-      .hero-top {
-        align-items: flex-start;
-        display: flex;
-        gap: 14px;
-        justify-content: space-between;
-      }
-
-      h1 {
-        font-size: 28px;
-        line-height: 1.25;
-        margin: 0 0 8px;
-      }
-
-      h2 {
-        font-size: 18px;
-        margin: 0 0 12px;
-      }
-
-      .subtitle,
-      .status,
-      .muted {
-        color: var(--muted);
-      }
-
-      .subtitle {
-        margin: 0;
-      }
-
-      .meta-grid,
-      .summary-grid {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin-top: 18px;
-      }
-
-      .meta-card,
-      .summary-card {
-        background: var(--soft);
-        border: 1px solid #eef2f7;
-        border-radius: 12px;
-        padding: 12px;
-      }
-
-      .meta-label {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 4px;
-      }
-
-      .meta-value {
-        font-weight: 800;
-        overflow-wrap: anywhere;
-      }
-
-      main {
-        display: grid;
-        gap: 18px;
-        margin-top: 18px;
-      }
-
-      .panel {
-        padding: 18px;
-      }
-
-      .status {
-        font-size: 13px;
-        margin: 0 0 14px;
-      }
-
-      .status.error {
-        color: var(--danger);
-        font-weight: 700;
-      }
-
-      .table-wrap {
-        overflow-x: auto;
-      }
-
-      table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-
-      th,
-      td {
-        border-bottom: 1px solid var(--line);
-        padding: 10px 9px;
-        text-align: right;
-        white-space: nowrap;
-      }
-
-      th {
-        background: #fafafa;
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 800;
-      }
-
-      th:nth-child(2),
-      td:nth-child(2),
-      .kpi-table td:first-child,
-      .kpi-table th:first-child,
-      .kpi-table td:nth-child(2),
-      .kpi-table th:nth-child(2),
-      .kpi-table td:nth-child(5),
-      .kpi-table th:nth-child(5) {
-        text-align: left;
-      }
-
-      tbody tr:nth-child(even) {
-        background: #fbfcff;
-      }
-
-      tbody tr:hover {
-        background: #f0f6ff;
-      }
-
-      .chart-grid {
-        display: grid;
-        gap: 18px;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .chart-card {
-        height: 360px;
-      }
-
-      .chart-box {
-        height: 292px;
-        position: relative;
-      }
-
-      .detail-chart-card {
-        height: 392px;
-      }
-
-      .detail-chart-card .chart-box {
-        height: 320px;
-      }
-
-      .chart-box canvas {
-        height: 100% !important;
-        width: 100% !important;
-      }
-
-      .summary-card {
-        min-height: 76px;
-      }
-
-      .summary-card .meta-value {
-        font-size: 17px;
-      }
-
-      .detail-header {
-        align-items: center;
-        display: flex;
-        gap: 12px;
-        justify-content: space-between;
-      }
-
-      .detail-title {
-        overflow-wrap: anywhere;
-      }
-
-      .detail-status {
-        margin: 14px 0 0;
-      }
-
-      .kpi-table .rating-strong {
-        color: var(--strong);
-        font-weight: 800;
-      }
-
-      .kpi-table .rating-watch {
-        color: var(--watch);
-        font-weight: 800;
-      }
-
-      .kpi-table .rating-weak {
-        color: var(--weak);
-        font-weight: 800;
-      }
-
-      .note-list {
-        color: var(--muted);
-        margin: 0;
-        padding-left: 20px;
-      }
-
-      .note-list li {
-        margin: 6px 0;
-      }
-
-      @media (max-width: 900px) {
-        .hero-top,
-        .detail-header {
-          display: grid;
-        }
-
-        .meta-grid,
-        .summary-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .chart-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      @media (max-width: 560px) {
-        .app-shell {
-          padding-inline: 12px;
-        }
-
-        .meta-grid,
-        .summary-grid {
-          grid-template-columns: 1fr;
-        }
-
-        h1 {
-          font-size: 23px;
-        }
-
-        .gate-card,
-        .panel,
-        .hero-card {
-          border-radius: 12px;
-        }
-      }
-    </style>
+    <title>mqquant dashboard (1001plus)</title>
+    <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="./app.js" defer></script>
   </head>
   <body>
-    <section id="access-gate" class="gate-page">
-      <div class="gate-card">
-        <input
-          id="password-input"
-          type="password"
-          autocomplete="current-password"
-          placeholder="密碼"
-        />
-        <button id="enter-button" class="btn primary" type="button">確定</button>
-        <p id="login-error" class="error-message" aria-live="polite"></p>
-      </div>
-    </section>
-
-    <div id="app-shell" class="app-shell hidden">
-      <header class="hero-card">
-        <div class="hero-top">
-          <div>
-            <h1>三劍客量化科技｜策略排行榜</h1>
-            <p class="subtitle">本頁僅供策略研究與風險控管使用，不代表實盤交易建議。</p>
-          </div>
-          <button id="logout-button" class="btn secondary" type="button">登出</button>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">1001plus artifact viewer</p>
+          <h1>mqquant dashboard (1001plus)</h1>
+          <p class="subtitle">
+            只讀取本機 <code>runs/latest/</code> mock artifacts，不執行回測、最佳化或 heavy compute。
+          </p>
         </div>
-        <div class="meta-grid">
-          <div class="meta-card">
-            <div class="meta-label">資料來源</div>
-            <div id="data-source" class="meta-value">載入中</div>
-          </div>
-          <div class="meta-card">
-            <div class="meta-label">更新時間</div>
-            <div id="generated-at" class="meta-value">載入中</div>
-          </div>
-          <div class="meta-card">
-            <div class="meta-label">策略數量</div>
-            <div id="summary" class="meta-value">載入中</div>
-          </div>
-          <div class="meta-card">
-            <div class="meta-label">Run ID</div>
-            <div id="run-id" class="meta-value">載入中</div>
-          </div>
-        </div>
+        <div class="source-pill" id="data-source">Loading artifacts...</div>
       </header>
 
-      <main id="ranking-view">
-        <section class="panel">
-          <h2>Top10 策略排行榜</h2>
-          <p id="status" class="status">正在載入 GitHub ranking JSON...</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>排名</th>
-                  <th>策略族群</th>
-                  <th>策略代號</th>
-                  <th>分數</th>
-                  <th>扣成本後總損益</th>
-                  <th>通過率</th>
-                  <th>最大回撤</th>
-                  <th>PF</th>
-                  <th>查看</th>
-                </tr>
-              </thead>
-              <tbody id="ranking-body"></tbody>
-            </table>
-          </div>
-        </section>
+      <section id="error-panel" class="error-card hidden">
+        請用本機伺服器開啟（不要用 file://）
+      </section>
 
-        <section class="chart-grid">
-          <div class="panel chart-card">
-            <h2>Top10 分數</h2>
-            <div class="chart-box">
-              <canvas id="score-chart"></canvas>
-            </div>
-          </div>
-          <div class="panel chart-card">
-            <h2>Top10 扣成本後損益</h2>
-            <div class="chart-box">
-              <canvas id="profit-chart"></canvas>
-            </div>
-          </div>
-        </section>
-      </main>
+      <section class="grid summary-grid" aria-label="Run Summary">
+        <article class="card metric-card">
+          <span>總報酬</span>
+          <strong id="summary-return">--</strong>
+        </article>
+        <article class="card metric-card">
+          <span>Sharpe</span>
+          <strong id="summary-sharpe">--</strong>
+        </article>
+        <article class="card metric-card">
+          <span>MDD</span>
+          <strong id="summary-mdd">--</strong>
+        </article>
+      </section>
 
-      <main id="detail-view" class="hidden">
-        <section class="hero-card">
-          <div class="detail-header">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Ranking</p>
+            <h2>Top Strategies</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>strategy_id</th>
+                <th>score</th>
+                <th>sharpe</th>
+                <th>mdd</th>
+                <th>trades</th>
+              </tr>
+            </thead>
+            <tbody id="top-strategies-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="grid chart-grid">
+        <article class="card chart-card">
+          <div class="section-head">
             <div>
-              <p class="status">單一策略詳情</p>
-              <h1 id="detail-strategy-name" class="detail-title">策略名稱</h1>
-            </div>
-            <button id="back-button" class="btn secondary" type="button">返回排行榜</button>
-          </div>
-          <div class="summary-grid">
-            <div class="summary-card">
-              <div class="meta-label">分數</div>
-              <div id="detail-score" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">扣成本後總損益</div>
-              <div id="detail-profit" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">通過率</div>
-              <div id="detail-pass-rate" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">最大回撤</div>
-              <div id="detail-mdd" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">PF</div>
-              <div id="detail-pf" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">Run ID</div>
-              <div id="detail-run-id" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">更新時間</div>
-              <div id="detail-generated-at" class="meta-value">-</div>
-            </div>
-            <div class="summary-card">
-              <div class="meta-label">排名</div>
-              <div id="detail-rank" class="meta-value">-</div>
+              <p class="eyebrow">Equity</p>
+              <h2>Equity Curve</h2>
             </div>
           </div>
-          <p id="detail-data-status" class="status detail-status"></p>
-        </section>
+          <div class="chart-box">
+            <canvas id="equity-chart"></canvas>
+          </div>
+        </article>
 
-        <section class="chart-grid">
-          <div class="panel detail-chart-card">
-            <h2 id="detail-equity-title">每週資產曲線</h2>
-            <div class="chart-box">
-              <canvas id="detail-equity-chart"></canvas>
+        <article class="card chart-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Risk</p>
+              <h2>Drawdown Curve</h2>
             </div>
           </div>
-          <div class="panel detail-chart-card">
-            <h2 id="detail-period-title">每週損益</h2>
-            <div class="chart-box">
-              <canvas id="detail-period-chart"></canvas>
-            </div>
+          <div class="chart-box">
+            <canvas id="drawdown-chart"></canvas>
           </div>
-        </section>
+        </article>
+      </section>
 
-        <section class="panel">
-          <h2>KPI 表</h2>
-          <div class="table-wrap">
-            <table class="kpi-table">
-              <thead>
-                <tr>
-                  <th>類別</th>
-                  <th>指標</th>
-                  <th>數值</th>
-                  <th>評估</th>
-                  <th>說明</th>
-                </tr>
-              </thead>
-              <tbody id="detail-kpi-body"></tbody>
-            </table>
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Trade List</p>
+            <h2>Trades</h2>
           </div>
-        </section>
+          <span class="muted">最近 20 筆</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>datetime</th>
+                <th>price</th>
+                <th>side</th>
+                <th>pnl</th>
+                <th>cumulative_pnl</th>
+              </tr>
+            </thead>
+            <tbody id="trades-body"></tbody>
+          </table>
+        </div>
+      </section>
 
-        <section class="panel">
-          <h2>成本壓力測試</h2>
-          <div class="table-wrap">
-            <table class="kpi-table">
-              <thead>
-                <tr>
-                  <th>單邊滑點</th>
-                  <th>總淨利</th>
-                  <th>PF</th>
-                  <th>最大回撤</th>
-                  <th>是否通過</th>
-                </tr>
-              </thead>
-              <tbody id="detail-cost-stress-body"></tbody>
-            </table>
+      <section class="grid info-grid" aria-label="OOS WFO Risk">
+        <article class="card info-card">
+          <p class="eyebrow">OOS</p>
+          <h2>OOS Summary</h2>
+          <dl id="oos-card"></dl>
+        </article>
+        <article class="card info-card">
+          <p class="eyebrow">WFO</p>
+          <h2>WFO Summary</h2>
+          <dl id="wfo-card"></dl>
+        </article>
+        <article class="card info-card">
+          <p class="eyebrow">Risk</p>
+          <h2>Risk Report</h2>
+          <dl id="risk-card"></dl>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Decision</p>
+            <h2>Decision Audit</h2>
           </div>
-        </section>
+        </div>
+        <div class="decision-grid">
+          <div>
+            <span>baseline</span>
+            <strong id="audit-baseline">--</strong>
+          </div>
+          <div>
+            <span>challenger</span>
+            <strong id="audit-challenger">--</strong>
+          </div>
+          <div>
+            <span>decision</span>
+            <strong id="audit-decision">--</strong>
+          </div>
+        </div>
+        <p class="reason" id="audit-reason">--</p>
+      </section>
+    </main>
 
-        <section class="panel">
-          <h2>策略說明</h2>
-          <ul class="note-list">
-            <li>這是 WFO / Pipeline 結果。</li>
-            <li>完整詳情頁使用 strategy_detail.json 的 weekly series 與交易統計，不顯示逐筆交易明細。</li>
-            <li>這不是實盤績效，也不代表未來保證。</li>
-            <li>策略仍需經過 Forward Test 與人工審核。</li>
-          </ul>
-        </section>
-      </main>
-    </div>
+    <script src="app.js"></script>
   </body>
 </html>
