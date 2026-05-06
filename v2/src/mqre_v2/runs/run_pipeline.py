@@ -6,10 +6,14 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
+from mqre_v2.core.trades import TradeRecord
+from mqre_v2.io.txt_parser import parse_xs_txt
 from mqre_v2.pipeline.txt_wfo_pipeline import run_txt_wfo_pipeline
 from mqre_v2.reporting.wfo_report import export_json_report
 from mqre_v2.runs.run_manager import load_manifest, write_manifest
 from mqre_v2.runs.run_txt_validator import validate_run_txt
+
+STARTING_EQUITY = 100000.0
 
 
 @dataclass(frozen=True)
@@ -97,7 +101,14 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
     details_dir.mkdir(parents=True, exist_ok=True)
 
     for item in ranking:
-        payload = _build_strategy_detail_payload(run_id, item)
+        trades = parse_xs_txt(
+            Path(str(item["txt_path"])).read_text(encoding="utf-8-sig")
+        )
+        payload = _build_strategy_detail_payload(
+            run_id,
+            item,
+            weekly_series=build_weekly_series(trades),
+        )
         detail_path = details_dir / f"{payload['strategy_name']}.json"
         detail_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
@@ -105,16 +116,40 @@ def _write_strategy_detail_reports(root: Path, run_id: str, ranking: list[dict])
         )
 
 
-def _build_strategy_detail_payload(run_id: str, item: dict) -> dict:
-    period_pnl = []
+def build_weekly_series(trades: list[TradeRecord]) -> dict:
+    weekly_totals: dict[str, float] = {}
+    for trade in trades:
+        iso_year, iso_week, _ = trade.exit_time.date().isocalendar()
+        week_key = f"{iso_year}-W{iso_week:02d}"
+        weekly_totals[week_key] = weekly_totals.get(week_key, 0.0) + float(trade.pnl)
+
+    equity = STARTING_EQUITY
     equity_curve = []
+    weekly_pnl = []
+    for week in sorted(weekly_totals):
+        pnl = weekly_totals[week]
+        equity += pnl
+        weekly_pnl.append({"week": week, "pnl": pnl})
+        equity_curve.append({"week": week, "equity": equity})
+
+    return {
+        "equity_curve": equity_curve,
+        "weekly_pnl": weekly_pnl,
+    }
+
+
+def _build_strategy_detail_payload(
+    run_id: str,
+    item: dict,
+    weekly_series: dict,
+) -> dict:
+    period_pnl = []
     equity = 0.0
 
     for index, round_result in enumerate(item.get("round_results", []), start=1):
         pnl = _as_float(round_result.get("test_net_profit", 0.0))
         equity += pnl
         period_pnl.append({"index": index, "pnl": pnl})
-        equity_curve.append({"index": index, "equity": equity})
 
     score = _as_float(item["score"])
     total_profit = _as_float(item["total_test_net_profit"])
@@ -132,7 +167,8 @@ def _build_strategy_detail_payload(run_id: str, item: dict) -> dict:
             "max_test_mdd": max_mdd,
             "average_test_pf": average_pf,
         },
-        "equity_curve": equity_curve,
+        "equity_curve": weekly_series["equity_curve"],
+        "weekly_pnl": weekly_series["weekly_pnl"],
         "period_pnl": period_pnl,
         "kpi": {
             "score": score,

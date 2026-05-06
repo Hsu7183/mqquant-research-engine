@@ -381,7 +381,7 @@ async function renderStrategyDetail(strategyName) {
     max_test_mdd: summary.max_test_mdd,
     average_test_pf: summary.average_test_pf,
   });
-  renderDetailCharts(source, row);
+  renderDetailCharts(source);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -409,7 +409,7 @@ function buildDetailFromRankingRow(row) {
       average_test_pf: Number(row.average_test_pf) || 0,
     },
     equity_curve: [],
-    period_pnl: [],
+    weekly_pnl: [],
     kpi: {
       score: Number(row.score) || 0,
       profit,
@@ -488,7 +488,7 @@ function appendTextCell(row, value) {
   return cell;
 }
 
-function renderDetailCharts(detail, rankingRow) {
+function renderDetailCharts(detail) {
   if (!window.Chart) {
     return;
   }
@@ -496,22 +496,20 @@ function renderDetailCharts(detail, rankingRow) {
   const hasDetailSeries =
     Array.isArray(detail.equity_curve) &&
     detail.equity_curve.length > 0 &&
-    Array.isArray(detail.period_pnl) &&
-    detail.period_pnl.length > 0;
+    Array.isArray(detail.weekly_pnl) &&
+    detail.weekly_pnl.length > 0;
 
   if (hasDetailSeries) {
     document.getElementById("detail-equity-title").textContent = "資產曲線";
     document.getElementById("detail-period-title").textContent = "每期損益";
     renderEquityCurve(detail.equity_curve);
-    renderPeriodPnl(detail.period_pnl);
+    renderPeriodPnl(detail.weekly_pnl);
     return;
   }
 
-  document.getElementById("detail-equity-title").textContent =
-    "策略分數相對排行（detail JSON 未提供）";
-  document.getElementById("detail-period-title").textContent =
-    "策略淨利相對排行（detail JSON 未提供）";
-  renderRankingFallbackCharts(rankingRow);
+  document.getElementById("detail-equity-title").textContent = "尚未產生週期資料";
+  document.getElementById("detail-period-title").textContent = "尚未產生週期資料";
+  renderEmptyDetailCharts();
 }
 
 function renderEquityCurve(equityCurve) {
@@ -522,7 +520,7 @@ function renderEquityCurve(equityCurve) {
   detailEquityChart = new Chart(document.getElementById("detail-equity-chart"), {
     type: "line",
     data: {
-      labels: equityCurve.map((item) => `#${item.index}`),
+      labels: equityCurve.map((item) => item.week),
       datasets: [
         {
           label: "資產曲線",
@@ -539,7 +537,7 @@ function renderEquityCurve(equityCurve) {
   });
 }
 
-function renderPeriodPnl(periodPnl) {
+function renderPeriodPnl(weeklyPnl) {
   if (detailPeriodChart) {
     detailPeriodChart.destroy();
   }
@@ -547,12 +545,12 @@ function renderPeriodPnl(periodPnl) {
   detailPeriodChart = new Chart(document.getElementById("detail-period-chart"), {
     type: "bar",
     data: {
-      labels: periodPnl.map((item) => `#${item.index}`),
+      labels: weeklyPnl.map((item) => item.week),
       datasets: [
         {
           label: "每期損益",
-          data: periodPnl.map((item) => item.pnl),
-          backgroundColor: periodPnl.map((item) =>
+          data: weeklyPnl.map((item) => item.pnl),
+          backgroundColor: weeklyPnl.map((item) =>
             item.pnl >= 0 ? "#10b981" : "#d32f2f",
           ),
           borderRadius: 6,
@@ -564,53 +562,44 @@ function renderPeriodPnl(periodPnl) {
   });
 }
 
-function renderRankingFallbackCharts(row) {
-  const top10 = currentReport.top_10.slice(0, 10);
-  const labels = top10.map((item) => `#${item.rank}`);
-
+function renderEmptyDetailCharts() {
   if (detailEquityChart) {
     detailEquityChart.destroy();
+    detailEquityChart = null;
   }
   if (detailPeriodChart) {
     detailPeriodChart.destroy();
+    detailPeriodChart = null;
   }
 
   detailEquityChart = new Chart(document.getElementById("detail-equity-chart"), {
-    type: "bar",
+    type: "line",
     data: {
-      labels,
+      labels: [],
       datasets: [
         {
-          label: "分數",
-          data: top10.map((item) => item.score),
-          backgroundColor: top10.map((item) =>
-            item.strategy_name === row.strategy_name ? "#d32f2f" : "#93c5fd",
-          ),
-          borderRadius: 6,
-          maxBarThickness: 34,
+          label: "尚未產生週期資料",
+          data: [],
+          borderColor: "#94a3b8",
         },
       ],
     },
-    options: detailChartOptions("分數"),
+    options: detailChartOptions("equity"),
   });
 
   detailPeriodChart = new Chart(document.getElementById("detail-period-chart"), {
     type: "bar",
     data: {
-      labels,
+      labels: [],
       datasets: [
         {
-          label: "總獲利",
-          data: top10.map((item) => item.total_test_net_profit),
-          backgroundColor: top10.map((item) =>
-            item.strategy_name === row.strategy_name ? "#10b981" : "#bbf7d0",
-          ),
-          borderRadius: 6,
-          maxBarThickness: 34,
+          label: "尚未產生週期資料",
+          data: [],
+          backgroundColor: "#cbd5e1",
         },
       ],
     },
-    options: detailChartOptions("總獲利"),
+    options: detailChartOptions("pnl"),
   });
 }
 

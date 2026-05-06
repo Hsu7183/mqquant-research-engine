@@ -73,7 +73,7 @@ def test_each_strategy_has_detail_json(tmp_path) -> None:
     ]
 
 
-def test_strategy_detail_equity_curve_length_matches_rounds(tmp_path) -> None:
+def test_strategy_detail_equity_curve_uses_weekly_series(tmp_path) -> None:
     run_path = _create_run(tmp_path)
     _write_xs(run_path, "alpha")
     _write_txt(run_path, "alpha", 100, 120)
@@ -90,7 +90,8 @@ def test_strategy_detail_equity_curve_length_matches_rounds(tmp_path) -> None:
     )
 
     assert len(payload["equity_curve"]) == 1
-    assert payload["equity_curve"][0] == {"index": 1, "equity": 20.0}
+    assert payload["equity_curve"][0] == {"week": "2023-W09", "equity": 100020.0}
+    assert payload["weekly_pnl"][0] == {"week": "2023-W09", "pnl": 20.0}
     assert payload["period_pnl"][0] == {"index": 1, "pnl": 20.0}
 
 

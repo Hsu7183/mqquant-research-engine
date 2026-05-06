@@ -121,10 +121,10 @@ https://raw.githubusercontent.com/Hsu7183/mqquant-research-engine/main/runs/late
     "average_test_pf": 0.0
   },
   "equity_curve": [
-    { "index": 1, "equity": 0.0 }
+    { "week": "2024-W01", "equity": 100500.0 }
   ],
-  "period_pnl": [
-    { "index": 1, "pnl": 0.0 }
+  "weekly_pnl": [
+    { "week": "2024-W01", "pnl": 500.0 }
   ],
   "kpi": {
     "score": 0.0,
@@ -143,12 +143,12 @@ https://raw.githubusercontent.com/Hsu7183/mqquant-research-engine/main/runs/late
 1. Dashboard 先嘗試讀取 `runs/latest/reports/details/{strategy_name}.json`
 2. 若 detail JSON 存在，詳情頁顯示：
    - 策略摘要卡
-   - 資產曲線
-   - 每期損益
+   - 每週資產曲線
+   - 每週損益
    - KPI 表與 Strong / Watch / Weak 評等
 3. 若 detail JSON 不存在或讀取失敗，fallback 使用 ranking row：
    - 顯示 ranking report 可用 KPI
-   - 圖表改為該策略在 Top10 中的分數 / 淨利相對排行
+   - 圖表顯示「尚未產生週期資料」
 
 詳情頁目前不包含完整逐筆交易明細，也不假裝有交易明細。若未來要顯示逐筆交易，需另行擴充 report schema 或提供交易明細 JSON。
 
@@ -163,6 +163,6 @@ https://raw.githubusercontent.com/Hsu7183/mqquant-research-engine/main/runs/late
 - Top10 策略排行榜
 - Top10 分數圖
 - Top10 獲利圖
-- 資產曲線圖
-- 每期損益圖
+- 每週資產曲線圖
+- 每週損益圖
 - KPI 表
