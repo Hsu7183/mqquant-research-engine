@@ -1,33 +1,109 @@
-# mqquant 量化策略研究引擎
+# mqquant Research Engine
 
-本專案為 mqquant 系統的核心策略研究與決策引擎。
+mqquant-research-engine is the standard strategy governance and research engine for mqquant.
 
-目標是建立一套：
-可重複、可驗證、可決策、可長期演進的量化策略研發流程。
+This repository is a research, reporting, observation, and decision-support system. It is not an execution system.
 
-## 核心功能
+## Standard Repository Layout
 
-1. 策略生成（optimizer）
-2. 單次樣本外驗證（OOS）
-3. 多輪 Walk-Forward 驗證（WFO）
-4. gap 防污染機制
-5. 穩定區 / 參數家族分析
-6. 滑價壓力測試
-7. PBO / DSR 過度最佳化風險評估
-8. Forward Test 前測系統
-9. Baseline / Challenger 決策流程
+```text
+mqquant-research-engine/
+  .github/
+  configs/
+  dashboard/
+  docs/
+  runs/latest/reports/
+  templates/
+  v2/
+    src/mqre_v2/
+    tests/
+  BASELINE.md
+  HANDOFF.md
+  README.md
+  requirements.txt
+  run_all_tests.cmd
+  run_gui.cmd
+  run_gui.ps1
+```
 
-## 核心哲學
+## Core Capabilities
 
-- 不找最漂亮策略，只找最不容易死的策略
-- 單次 OOS 只能初篩，不能單獨決定上線
-- 候選越多，越要懷疑第一名
-- 單點最優不如穩定區
-- 未經前測，不升格正式策略
+- XS / TXT research pipeline
+- Trade TXT parser
+- M1 OHLC TXT parser
+- WFO window generation, result schema, gates, and runner
+- TXT -> WFO -> ranking JSON pipeline
+- Auto Research Pipeline
+- Forward Test Tracking
+- Forward Evaluation
+- Strategy Registry
+- Promotion Recommendation
+- Decision Audit Log
+- Auto Promotion Pipeline
+- Streamlit GUI
+- Static GitHub Pages dashboard
 
-## 專案狀態
+## Current Flow
 
-目前主線為：
-01-01-01 策略研究與決策工作台
+```text
+TXT folder
+-> WFO Pipeline
+-> Ranking JSON
+-> TopN
+-> Forward candidate
+-> Forward Evaluation
+-> Strategy Registry
+-> Promotion Recommendation
+-> Decision Audit Log
+```
 
-此專案將逐步升級為完整策略決策系統
+## Launch
+
+Windows GUI:
+
+```cmd
+run_gui.cmd
+```
+
+or:
+
+```powershell
+.\run_gui.ps1
+```
+
+Run tests:
+
+```cmd
+run_all_tests.cmd
+```
+
+or:
+
+```powershell
+python -m pytest -q
+```
+
+Dashboard:
+
+```text
+https://hsu7183.github.io/mqquant-research-engine/dashboard/
+```
+
+## Standard Version Cleanup
+
+The historical `01-01-01` workbench bundle has been removed from the standard repository.
+
+Reason:
+
+- It was a legacy data/workbench package.
+- The maintained system no longer imports or executes it.
+- M1 parsing now exists independently in `mqre_v2.io.m1_parser`.
+- Dashboard data is served from `runs/latest/reports/`.
+
+## Boundaries
+
+- No broker API integration.
+- No XQ API integration.
+- No automatic order placement.
+- No automatic live strategy switching.
+- Promotion recommendations require human review.

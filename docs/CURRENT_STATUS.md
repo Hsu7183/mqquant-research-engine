@@ -1,45 +1,42 @@
-# Current WFO System Status
+# Current Status
+
+Date: 2026-05-06
 
 ## Version
 
-- version: v1.0 (stable)
-- latest commit: d1b30b7801f52b3588c6daee8b59a6c612dd6334
-- tests: 200 passed
-- 系統定位：策略治理系統（非交易系統）
-- version: v1.0 stable
+- version: v2 standard
 - system type: strategy governance system, not execution system
-- next direction: v2～v4 roadmap
+- cleanup status: standard repository layout finalized
+- latest verified tests before cleanup: `219 passed`
 
-## Test Status
+## Standard Layout
 
-- `python -m pytest -q` = 200 passed
+The repository is now organized around:
 
-## Level 1～4 Mainline
+- `.github/`
+- `configs/`
+- `dashboard/`
+- `docs/`
+- `runs/latest/reports/`
+- `templates/`
+- `v2/src/mqre_v2/`
+- `v2/tests/`
 
-Level 1～4 是目前 mqquant 的主線，範圍是研究、報表、觀察與決策基礎。
+## Removed Legacy Bundle
 
-目前明確不做：
+`01-01-01/` was removed from the standard repo.
 
-- 不接券商
-- 不接 XQ API
-- 不自動下單
-- 不做自動交易
+Reason:
 
-## Latest Core Flow
-
-```text
-TXT 資料夾
--> WFO Pipeline
--> Ranking JSON
--> TopN
--> Forward candidate
--> Forward Evaluation
--> Strategy Registry active
-```
+- It was a legacy workbench and data package.
+- Formal v2 code, tests, dashboard, and GitHub Actions no longer import or execute it.
+- M1 TXT parsing is now independent in `mqre_v2.io.m1_parser`.
+- Dashboard data is served from `runs/latest/reports/`.
 
 ## Completed Modules
 
-- XS TXT Parser
+- Trade TXT Parser
+- M1 OHLC TXT Parser
 - WFO Window Generator
 - WFO Result Schema
 - WFO Pass/Fail Gate
@@ -48,8 +45,12 @@ TXT 資料夾
 - XS TXT WFO Adapter
 - WFO TXT CLI
 - TXT WFO Pipeline
+- Run Manifest System
+- Run TXT Validation
+- Run -> WFO Pipeline
+- Strategy Detail Reports
 - Forward Test Tracking
-- Forward Test 管理 GUI
+- Forward Test Management GUI
 - Baseline vs Challenger Decision
 - WFO JSON Report Exporter
 - Auto Research Pipeline
@@ -60,6 +61,21 @@ TXT 資料夾
 - Decision Audit Log
 - Auto Promotion Pipeline
 - Streamlit GUI
+- Static Dashboard
+
+## Latest Core Flow
+
+```text
+TXT folder
+-> WFO Pipeline
+-> Ranking JSON
+-> TopN
+-> Forward candidate
+-> Forward Evaluation
+-> Strategy Registry active
+-> Promotion Recommendation
+-> Decision Audit Log
+```
 
 ## GUI Modes
 
@@ -74,20 +90,18 @@ TXT 資料夾
 9. Promotion Recommendation
 10. Auto Promotion Pipeline
 
-## Level 4 Support
+## Boundaries
 
-- Forward Evaluation 可將 `forward_testing` 策略評估為 `promoted` / `rejected`。
-- Strategy Registry 可將 `promoted` 策略登錄為 `active`。
-- Promotion Recommendation 可根據 ranking report 產生升級建議。
-- Decision Audit Log 可回溯每次 promotion decision。
-- Auto Promotion Pipeline 可自動產生 recommendation + audit log，並輸出人工確認用摘要。
-- `active` 只代表正式策略版本治理狀態，不代表下單或啟動交易。
-- v4 Auto Decision Layer 已開始；所有建議都保留 `requires_human_review=True`。
-- v4 仍不自動下單、不自動切換策略。
+- 不接券商
+- 不接 XQ API
+- 不自動下單
+- 不做自動交易
+- promoted / active 只代表策略治理狀態，不代表啟動交易
+- promotion recommendation 仍需人工確認
 
-## Next Steps
+## Next Direction
 
-1. 將真實 0313 / 1001 / 0807 TXT 接入 Auto Research Pipeline。
-2. 建立 Level 3 決策規則與報表。
-3. 建立 Level 4 forward observation review 報表。
-4. 保持 01-01-01 baseline immutable。
+1. Keep `runs/latest/reports/` updated for dashboard.
+2. Add real TXT exports into pipeline runs.
+3. Continue v2～v4 governance/reporting improvements.
+4. Keep v5 execution layer out of scope.

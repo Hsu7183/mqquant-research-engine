@@ -1,14 +1,22 @@
-# Core Baseline: 01-01-01
+# Core Baseline
 
-本專案中的 `01-01-01` 為 mqquant 策略研究系統的唯一核心基準版本。
+The historical `01-01-01` workbench was the original mqquant research baseline.
 
-規則：
+In the v2 standard repository, the old `01-01-01/` bundle is no longer stored as a live project folder. It was removed because it was a legacy data/workbench package and is no longer imported or executed by the maintained system.
 
-1. 不得直接修改 01-01-01 原始邏輯
-2. 所有策略改良需建立：
-   - 01-01
-   - 02-01
-3. 所有結果必須與 baseline 比較
-4. 所有 forward test 必須記錄 baseline vs challenger
+Current baseline governance is represented by:
 
-此版本為 Immutable Core（不可變核心）
+- WFO specifications in `docs/WFO_SPEC.md`
+- baseline-vs-challenger decision logic in `mqre_v2.validation.decision`
+- dashboard reports in `runs/latest/reports/`
+- strategy registry records
+- decision audit logs
+
+Rules:
+
+1. Do not restore or edit the historical `01-01-01` workbench in the standard repo.
+2. All strategy changes must be evaluated through the current v2 pipeline.
+3. All results must be compared against the selected baseline report.
+4. All forward tests must record baseline vs challenger context.
+
+The baseline is now a governed report/registry concept, not a live legacy folder.

@@ -1,4 +1,0 @@
-entry_time,exit_time,side,entry_price,exit_price,qty,slippage_points,fee_points,pnl_points,pnl_after_cost_points
-2026-01-02T09:01:00,2026-01-02T09:05:00,long,20000,20010,1,2,1,10,7
-2026-01-02T09:10:00,2026-01-02T09:20:00,short,20015,20005,1,2,1,10,7
-2026-01-02T09:30:00,2026-01-02T09:35:00,long,20020,20012,1,2,1,-8,-11

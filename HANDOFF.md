@@ -1,65 +1,47 @@
 # Codex Handoff Instructions
 
-當任何 Codex（單機 / 雲端）接手本專案時，請先閱讀：
+When any Codex instance takes over this repository, read these files first:
 
-1. BASELINE.md
-2. 本文件
-3. docs/WFO_SPEC.md
-4. docs/WFO_MODULES.md
-5. docs/CURRENT_STATUS.md
-6. docs/GUI_USAGE.md
+1. `README.md`
+2. `BASELINE.md`
+3. `docs/CURRENT_STATUS.md`
+4. `docs/GUI_USAGE.md`
+5. `docs/WFO_SPEC.md`
+6. `docs/WFO_MODULES.md`
+7. `docs/CLEANUP_AUDIT.md`
 
-並遵守：
+## Current Standard Version
 
-- 不得修改 01-01-01
-- 所有新策略必須建立於 projects/*
-- 所有驗證需包含：
-  - OOS
-  - WFO
-  - Baseline 對比
+This repo has been cleaned into the v2 standard layout.
+
+The maintained system is:
+
+- `v2/src/mqre_v2/`
+- `v2/tests/`
+- `dashboard/`
+- `docs/`
+- `configs/`
+- `templates/`
+- `.github/workflows/`
+- `runs/latest/reports/`
+
+The historical `01-01-01` workbench bundle was removed because formal code, tests, dashboard, and CI no longer depend on it. The M1 TXT parser is now independent in `mqre_v2.io.m1_parser`.
+
+## Core Rule
+
+This repository is a strategy governance system, not a trading execution system.
+
+Do not add:
+
+- broker API integration
+- XQ API automation
+- automatic order placement
+- automatic live strategy switching
 
 ## System Flow
 
-Step1：Optimizer
-Step2：Single OOS
-Step3：Walk Forward
-Step4：Validation（MDD / Sharpe / PF）
-Step5：Forward Test（baseline vs challenger）
-
-此文件為跨平台接續工作的唯一入口。
-
-## Completed Core Modules
-
-目前已完成模組：
-
-- XS TXT Parser
-- WFO Window Generator
-- WFO Result Schema
-- WFO Pass/Fail Gate
-- WFO Runner Skeleton
-- Optimizer Adapter Skeleton
-- WFO TXT Adapter
-- WFO TXT CLI
-- TXT WFO Pipeline
-- Forward Test Tracking
-- Forward Test 管理 GUI
-- Forward Evaluation
-- Strategy Registry
-- Promotion Recommendation Report
-- Decision Audit Log
-- Auto Promotion Pipeline
-- Baseline vs Challenger Decision
-- WFO JSON Report Exporter
-- Auto Research Pipeline
-
-## Level 1～4 Mainline
-
-Level 1～4 是目前主線，僅涵蓋研究、報表、觀察與決策基礎。
-
-最新流程：
-
 ```text
-TXT 資料夾
+TXT folder
 -> WFO Pipeline
 -> Ranking JSON
 -> TopN
@@ -71,28 +53,36 @@ TXT 資料夾
 -> Auto Promotion Pipeline summary
 ```
 
-注意：
+## Completed Core Modules
 
-- 這是全自動研究，不是全自動交易
-- 目前不接券商
-- 目前不接 XQ API
-- 目前不會自動下單
-- promoted 策略可登錄為 active，但不代表啟動交易
-- Promotion Recommendation 只產生建議，不自動切換實盤策略
-- requires_human_review=True
-- Decision Audit Log 可回溯每次 promotion decision
-- 仍不自動下單
-
-## Auto Promotion Pipeline
-
-- 自動產生 promotion recommendation JSON
-- 自動寫入 Decision Audit Log
-- 只輸出人工確認用摘要
-- 仍需人工確認，仍不下單、不自動切換實盤策略
+- Trade TXT Parser
+- M1 OHLC TXT Parser
+- WFO Window Generator
+- WFO Result Schema
+- WFO Pass/Fail Gate
+- WFO Runner Skeleton
+- Optimizer Adapter Skeleton
+- WFO TXT Adapter
+- WFO TXT CLI
+- TXT WFO Pipeline
+- Run Manifest System
+- Run TXT Validation
+- Run -> WFO Pipeline
+- Strategy Detail Reports
+- Forward Test Tracking
+- Forward Test Management GUI
+- Forward Evaluation
+- Strategy Registry
+- Promotion Recommendation Report
+- Decision Audit Log
+- Auto Promotion Pipeline
+- Baseline vs Challenger Decision
+- WFO JSON Report Exporter
+- Auto Research Pipeline
 
 ## GUI
 
-GUI 已有 10 個模式：
+GUI modes:
 
 1. 單一策略 WFO
 2. Baseline vs Challenger
@@ -105,31 +95,39 @@ GUI 已有 10 個模式：
 9. Promotion Recommendation
 10. Auto Promotion Pipeline
 
-啟動方式：
+Launch:
 
 ```powershell
 .\run_gui.ps1
 ```
 
-或：
+or:
 
 ```cmd
 run_gui.cmd
 ```
 
+## Dashboard Data
+
+Keep these files tracked for GitHub Pages:
+
+- `runs/latest/reports/ranking.json`
+- `runs/latest/reports/details/*.json`
+
+General run outputs remain ignored by `.gitignore`.
+
 ## Test Status
 
-- `python -m pytest -q` = 200 passed
+Current standard verification command:
 
-## v1 凍結規則
+```powershell
+python -m pytest -q
+node --check dashboard/app.js
+python -m json.tool dashboard/sample_ranking.json
+```
 
-- v1 為穩定版本，不再修改核心邏輯
-- 所有新功能應建立於新分支或 v2
-- 不得在 v1 上直接開發實驗功能
+## Development Direction
 
-## v1 Freeze Rule
-
-- v1.0 為 stable baseline
-- 不得在 v1 直接開發實驗功能
-- v2～v4 應使用新分支或新 milestone
-- v5 自動交易暫不開發
+- v1～v4 governance capabilities are retained.
+- Future work should extend v2+ modules, not restore the old workbench bundle.
+- v5 execution layer remains out of scope.
