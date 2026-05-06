@@ -25,6 +25,8 @@ runs/latest/*
 !runs/latest/reports/
 !runs/latest/reports/**
 artifacts/
+!docs/artifacts/
+!docs/artifacts/**
 tmp/
 temp/
 
