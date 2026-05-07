@@ -12,8 +12,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_DIR = ROOT / "runs" / "latest"
-OUTPUT_PATH = ROOT / "docs" / "strategy" / "1001plus_v2_exit_regime_breakdown_20260507.md"
-DATA_SOURCE_LABEL = "1001plus_v2_exit 300-run artifacts"
+OUTPUT_DIR = ROOT / "docs" / "strategy"
+REPORT_DATE = "20260507"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +50,8 @@ def main() -> int:
     annual = _annual_breakdown(trades, equity)
     monthly = _monthly_breakdown(trades, equity)
     buckets = _regime_buckets(monthly)
+    context = _report_context(str(ranking[0].get("strategy_id", "")))
+    job_id = _latest_job_id()
 
     report = _build_report(
         top_strategy=ranking[0],
@@ -57,14 +59,18 @@ def main() -> int:
         annual=annual,
         monthly=monthly,
         buckets=buckets,
+        context=context,
+        job_id=job_id,
     )
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(report, encoding="utf-8")
+    output_path = OUTPUT_DIR / context["output_filename"]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report, encoding="utf-8")
 
     worst_year = min(annual, key=lambda row: row["total_pnl"])
     worst_month = min(monthly, key=lambda row: row["total_pnl"])
     pattern = _main_failure_pattern(buckets)
-    print(f"wrote {OUTPUT_PATH.relative_to(ROOT)}")
+    print(f"wrote {output_path.relative_to(ROOT)}")
+    print(f"job_id={job_id}")
     print(f"worst_year={worst_year['year']} total_pnl={_fmt(worst_year['total_pnl'])}")
     print(f"worst_month={worst_month['month']} total_pnl={_fmt(worst_month['total_pnl'])}")
     print(f"failure_pattern={pattern}")
@@ -254,6 +260,8 @@ def _build_report(
     annual: list[dict[str, Any]],
     monthly: list[dict[str, Any]],
     buckets: list[dict[str, Any]],
+    context: dict[str, str],
+    job_id: str,
 ) -> str:
     top_id = str(top_strategy.get("strategy_id", ""))
     data_note = _data_source_note(top_id)
@@ -262,13 +270,13 @@ def _build_report(
     pattern = _main_failure_pattern(buckets)
 
     lines = [
-        "# 1001plus v2_exit Annual / Regime Bucket Breakdown - 2026-05-07",
+        f"# {context['title']} - 2026-05-07",
         "",
         "## 1. Top Challenger",
         "",
-        f"- data source: `{DATA_SOURCE_LABEL}`",
-        "- source caution: this is not the earlier `risk_constrained` artifact set.",
-        "- scope: this report only describes the `v2_exit` failed experiment regime breakdown.",
+        f"- data source: `{context['data_source']}`",
+        f"- scope: {context['scope']}",
+        f"- job_id: `{job_id}`",
         f"- strategy_id: `{top_id}`",
         f"- promotion_decision: `{decision.get('promotion_decision', '')}`",
         f"- decision_reason: `{decision.get('reason', '')}`",
@@ -305,18 +313,51 @@ def _build_report(
         "2. Add a regime filter if the losses concentrate in `chop_bad` or high-volatility negative months.",
         "3. Reduce trade frequency only if high-trade-count months also show strongly negative expectancy.",
         "4. Re-check entry filters before adding more exit variations, especially if losses cluster in low-quality trend/chop buckets.",
-        "5. Re-run this script after restoring the intended risk_constrained artifacts if the current `runs/latest` is not the target experiment.",
+        "5. Re-run this script after each 300-run so the report title and source follow the current `runs/latest` artifacts.",
         "",
     ]
     return "\n".join(lines)
+
+
+def _report_context(strategy_id: str) -> dict[str, str]:
+    if strategy_id.startswith("1001plus_v2exit_"):
+        return {
+            "title": "1001plus v2_exit Annual / Regime Bucket Breakdown",
+            "data_source": "1001plus_v2_exit 300-run artifacts",
+            "scope": "this report only describes the `v2_exit` failed experiment regime breakdown.",
+            "output_filename": f"1001plus_v2_exit_regime_breakdown_{REPORT_DATE}.md",
+        }
+    if strategy_id.startswith("1001plus_"):
+        return {
+            "title": "1001plus risk_constrained Annual / Regime Bucket Breakdown",
+            "data_source": "1001plus risk_constrained 300-run artifacts",
+            "scope": "this report describes the risk_constrained 300-run regime breakdown.",
+            "output_filename": f"1001plus_risk_constrained_regime_breakdown_{REPORT_DATE}.md",
+        }
+    return {
+        "title": "1001plus Annual / Regime Bucket Breakdown",
+        "data_source": "unrecognized 1001plus-like artifacts",
+        "scope": "this report describes the current `runs/latest` artifacts.",
+        "output_filename": f"1001plus_regime_breakdown_{REPORT_DATE}.md",
+    }
 
 
 def _data_source_note(strategy_id: str) -> str:
     if strategy_id.startswith("1001plus_v2exit_"):
         return "`runs/latest` contains `1001plus_v2_exit` 300-run artifacts; this is not the earlier risk_constrained run."
     if strategy_id.startswith("1001plus_"):
-        return "`runs/latest` appears to contain 1001plus risk_constrained/default artifacts."
+        return "`runs/latest` contains 1001plus risk_constrained 300-run artifacts for this report."
     return "`runs/latest` strategy naming is not recognized as 1001plus."
+
+
+def _latest_job_id() -> str:
+    jobs_dir = ROOT / "runs" / "jobs"
+    if not jobs_dir.is_dir():
+        return ""
+    job_dirs = [path for path in jobs_dir.iterdir() if path.is_dir()]
+    if not job_dirs:
+        return ""
+    return max(job_dirs, key=lambda path: path.stat().st_mtime).name
 
 
 def _annual_table(rows: list[dict[str, Any]]) -> str:
