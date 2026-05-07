@@ -29,6 +29,7 @@ class Strategy1001PlusParams:
     begin_time: str = "0848"
     end_time: str = "1240"
     force_exit_time: str = "1312"
+    use_vwap_filter: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,17 +228,19 @@ def _entry_direction(snapshot: dict[str, Any], params: Strategy1001PlusParams) -
     prev_don_high = snapshot.get("prev_don_high")
     prev_don_low = snapshot.get("prev_don_low")
 
-    if None in {
+    required_values = {
         ema_short,
         ema_long,
         rsi,
-        vwap,
         prev_close,
         prev_high,
         prev_low,
         prev_don_high,
         prev_don_low,
-    }:
+    }
+    if params.use_vwap_filter:
+        required_values.add(vwap)
+    if None in required_values:
         return 0
     if int(snapshot.get("completed_count", 0)) < params.donchian_len + 1:
         return 0
@@ -245,10 +248,13 @@ def _entry_direction(snapshot: dict[str, Any], params: Strategy1001PlusParams) -
     long_break = float(prev_high) > float(prev_don_high) + params.min_break
     short_break = float(prev_low) < float(prev_don_low) - params.min_break
 
+    long_vwap_ok = not params.use_vwap_filter or float(prev_close) > float(vwap)
+    short_vwap_ok = not params.use_vwap_filter or float(prev_close) < float(vwap)
+
     if (
         float(ema_short) > float(ema_long)
         and float(rsi) > params.rsi_long_threshold
-        and float(prev_close) > float(vwap)
+        and long_vwap_ok
         and long_break
     ):
         return 1
@@ -256,7 +262,7 @@ def _entry_direction(snapshot: dict[str, Any], params: Strategy1001PlusParams) -
     if (
         float(ema_short) < float(ema_long)
         and float(rsi) < params.rsi_short_threshold
-        and float(prev_close) < float(vwap)
+        and short_vwap_ok
         and short_break
     ):
         return -1
