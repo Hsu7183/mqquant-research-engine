@@ -12,13 +12,23 @@ from mqre_v2.strategy.strategy_1001plus import (
     backtest_strategy_1001plus,
 )
 from mqre_v2.strategy.strategy_1001plus_generator import generate_1001plus_strategies
+from mqre_v2.strategy.strategy_1001plus_v2_exit import (
+    Strategy1001PlusV2ExitParams,
+    backtest_strategy_1001plus_v2_exit,
+)
+from mqre_v2.strategy.strategy_1001plus_v2_exit_generator import (
+    generate_1001plus_v2_exit_strategies,
+)
 
 __all__ = [
     "StrategyRegistryRecord",
     "Strategy1001PlusParams",
+    "Strategy1001PlusV2ExitParams",
     "append_strategy_registry_record",
     "backtest_strategy_1001plus",
+    "backtest_strategy_1001plus_v2_exit",
     "generate_1001plus_strategies",
+    "generate_1001plus_v2_exit_strategies",
     "promote_from_forward_log",
     "read_strategy_registry",
     "retire_strategy",
