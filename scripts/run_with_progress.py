@@ -27,6 +27,13 @@ from mqre_v2.strategy.strategy_1001plus import (  # noqa: E402
 from mqre_v2.strategy.strategy_1001plus_generator import (  # noqa: E402
     generate_1001plus_strategies,
 )
+from mqre_v2.strategy.strategy_1001plus_regime_filter import (  # noqa: E402
+    Strategy1001PlusRegimeFilterParams,
+    backtest_strategy_1001plus_regime_filter,
+)
+from mqre_v2.strategy.strategy_1001plus_regime_filter_generator import (  # noqa: E402
+    generate_1001plus_regime_filter_strategies,
+)
 from mqre_v2.strategy.strategy_1001plus_v2_exit import (  # noqa: E402
     Strategy1001PlusV2ExitParams,
     backtest_strategy_1001plus_v2_exit,
@@ -42,7 +49,11 @@ def main() -> int:
     parser.add_argument("--start-date", default="2020-01-01")
     parser.add_argument("--end-date", default=date.today().isoformat())
     parser.add_argument("--poll-seconds", type=float, default=1.0)
-    parser.add_argument("--use-generator", choices=["1001plus", "1001plus_v2_exit"], default="")
+    parser.add_argument(
+        "--use-generator",
+        choices=["1001plus", "1001plus_v2_exit", "1001plus_regime_filter"],
+        default="",
+    )
     parser.add_argument("--generator-mode", choices=["default", "risk_constrained"], default="default")
     parser.add_argument("--m1-path", default="M1.txt")
     parser.add_argument("--num-strategies", type=int, default=300)
@@ -66,6 +77,17 @@ def main() -> int:
         print(json.dumps(generation_summary, ensure_ascii=False, indent=2), flush=True)
     elif args.use_generator == "1001plus_v2_exit":
         generation_summary = _generate_1001plus_v2_exit_txts(
+            base_dir=args.base_dir,
+            m1_path=args.m1_path,
+            n=args.num_strategies,
+            seed=args.seed,
+            start_date=date.fromisoformat(args.start_date),
+            end_date=date.fromisoformat(args.end_date),
+            sample_bars=args.sample_bars,
+        )
+        print(json.dumps(generation_summary, ensure_ascii=False, indent=2), flush=True)
+    elif args.use_generator == "1001plus_regime_filter":
+        generation_summary = _generate_1001plus_regime_filter_txts(
             base_dir=args.base_dir,
             m1_path=args.m1_path,
             n=args.num_strategies,
@@ -258,6 +280,72 @@ def _generate_1001plus_v2_exit_txts(
 
     return {
         "generator": "1001plus_v2_exit",
+        "requested_strategies": n,
+        "generated_strategies": len(strategies),
+        "trade_files": generated_txt,
+        "empty_strategies": empty_strategies,
+        "txt_dir": str(txt_dir),
+        "sample_bars": sample_bars,
+    }
+
+
+def _generate_1001plus_regime_filter_txts(
+    base_dir: str,
+    m1_path: str,
+    n: int,
+    seed: int,
+    start_date: date,
+    end_date: date,
+    sample_bars: int,
+) -> dict[str, Any]:
+    print("1001plus regime filter generator started", flush=True)
+    bars = [
+        bar
+        for bar in parse_m1_txt(m1_path)
+        if start_date <= bar.ts.date() <= end_date
+    ]
+    if sample_bars < 0:
+        raise ValueError("sample_bars must be >= 0")
+    if sample_bars > 0:
+        bars = bars[-sample_bars:]
+    print(f"M1 bars loaded: {len(bars)}", flush=True)
+
+    strategies = generate_1001plus_regime_filter_strategies(n=n, seed=seed)
+    txt_dir = Path(base_dir) / "latest" / "txt"
+    detail_dir = Path(base_dir) / "latest" / "reports" / "details"
+    _clear_files(txt_dir, "*.txt")
+    _clear_files(detail_dir, "*.json")
+
+    generated_txt = 0
+    empty_strategies = 0
+    for index, strategy in enumerate(strategies, start=1):
+        strategy_name = str(strategy["strategy_name"])
+        params = Strategy1001PlusRegimeFilterParams(
+            strategy_name=strategy_name,
+            **strategy["params"],
+        )
+        trades = backtest_strategy_1001plus_regime_filter(bars, params)
+        if trades:
+            export_trades_to_xs_txt(
+                trades,
+                str(txt_dir / f"{strategy_name}.txt"),
+                strategy_name,
+            )
+            generated_txt += 1
+        else:
+            empty_strategies += 1
+        if index == len(strategies) or index % 25 == 0:
+            print(
+                (
+                    "1001plus regime filter generator progress: "
+                    f"{index}/{len(strategies)} strategies, "
+                    f"{generated_txt} trade files"
+                ),
+                flush=True,
+            )
+
+    return {
+        "generator": "1001plus_regime_filter",
         "requested_strategies": n,
         "generated_strategies": len(strategies),
         "trade_files": generated_txt,
