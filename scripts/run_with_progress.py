@@ -36,6 +36,7 @@ def main() -> int:
     parser.add_argument("--end-date", default=date.today().isoformat())
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     parser.add_argument("--use-generator", choices=["1001plus"], default="")
+    parser.add_argument("--generator-mode", choices=["default", "risk_constrained"], default="default")
     parser.add_argument("--m1-path", default="M1.txt")
     parser.add_argument("--num-strategies", type=int, default=300)
     parser.add_argument("--seed", type=int, default=1001)
@@ -50,6 +51,7 @@ def main() -> int:
             m1_path=args.m1_path,
             n=args.num_strategies,
             seed=args.seed,
+            mode=args.generator_mode,
             start_date=date.fromisoformat(args.start_date),
             end_date=date.fromisoformat(args.end_date),
             sample_bars=args.sample_bars,
@@ -118,11 +120,12 @@ def _generate_1001plus_challenger_txts(
     m1_path: str,
     n: int,
     seed: int,
+    mode: str,
     start_date: date,
     end_date: date,
     sample_bars: int,
 ) -> dict[str, Any]:
-    print("1001plus challenger generator started", flush=True)
+    print(f"1001plus challenger generator started: mode={mode}", flush=True)
     bars = [
         bar
         for bar in parse_m1_txt(m1_path)
@@ -134,7 +137,7 @@ def _generate_1001plus_challenger_txts(
         bars = bars[-sample_bars:]
     print(f"M1 bars loaded: {len(bars)}", flush=True)
 
-    strategies = generate_1001plus_strategies(n=n, seed=seed)
+    strategies = generate_1001plus_strategies(n=n, seed=seed, mode=mode)
     txt_dir = Path(base_dir) / "latest" / "txt"
     detail_dir = Path(base_dir) / "latest" / "reports" / "details"
     _clear_files(txt_dir, "*.txt")
@@ -170,6 +173,7 @@ def _generate_1001plus_challenger_txts(
 
     return {
         "generator": "1001plus",
+        "generator_mode": mode,
         "requested_strategies": n,
         "generated_strategies": len(strategies),
         "trade_files": generated_txt,
