@@ -27,10 +27,12 @@ def run_l1_l4_pipeline(
     min_score: float = 100.0,
     min_pass_rate: float = 0.6,
     max_mdd: float = 15000.0,
+    strategy: str = "simple_m1",
 ) -> dict[str, Any]:
     backtest_summary = backtest_m1_to_latest(
         m1_path=m1_path,
         strategy_name=strategy_name,
+        strategy=strategy,
     )
     ranking_path = Path(output_ranking_json)
 
@@ -71,6 +73,7 @@ def run_l1_l4_pipeline(
 
     return {
         "strategy_name": strategy_name,
+        "strategy": strategy,
         "m1_path": m1_path,
         "bars_count": backtest_summary["bars_count"],
         "trades_generated": backtest_summary["trades_count"],
@@ -103,6 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         min_score=args.min_score,
         min_pass_rate=args.min_pass_rate,
         max_mdd=args.max_mdd,
+        strategy=args.strategy,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2, allow_nan=False))
     return 0
@@ -112,6 +116,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run mqquant L1-L4 pipeline from M1 data.")
     parser.add_argument("--m1-path", required=True)
     parser.add_argument("--strategy-name", required=True)
+    parser.add_argument(
+        "--strategy",
+        choices=["simple_m1", "1001plus"],
+        default="simple_m1",
+    )
     parser.add_argument("--start-date", required=True, type=_parse_date)
     parser.add_argument("--end-date", required=True, type=_parse_date)
     parser.add_argument(
