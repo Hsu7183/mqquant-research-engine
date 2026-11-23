@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-23",
+  "series": "FITXN_1.TF",
+  "requested_range": [
+    "2026-11-01",
+    "2026-11-23"
+  ],
+  "actual_range": [
+    "2026-11-02 08:45",
+    "2026-11-23 13:43"
+  ],
+  "days": 16,
+  "bars_1m": 4784,
+  "source_file": "FITXN_1.TF_M1_FULL_202610301025.txt",
+  "source_sha256": "a1503ecd54795eca4d37ab281cc922e5aad7299e0e3c875d5a109e41c2868a69",
+  "endpoint_notes": [
+    "2026-11-18:08:45-13:29,285 rows",
+    "2026-11-23:08:45-13:43,299 rows; night session not provided"
+  ],
+  "warmup": "November supplied day-session bars only, beginning 2026-11-02; no other 2026 inputs",
+  "backtest_executed": false,
+  "original_december_page_changed": false
+}
